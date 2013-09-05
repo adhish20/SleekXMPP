@@ -77,7 +77,21 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 ip=urlopen('http://icanhazip.com').read()
                 msg.reply("Hi I am " + self.boundjid.full + " and I am on IP " + ip).send()
             elif msg['body'].startswith('?'):
-                logging.debug(' got a question ' + str(msg))
+                logging.debug('got a question ' + str(msg))
+                self.device.refresh([])
+                logging.debug('momentary values' + str(self.device.momentary_data))
+                msg.reply(str(self.device.momentary_data)).send()
+            elif msg['body'].startswith('T'):
+                logging.debug('got a toggle ' + str(msg))
+                if self.device.getrelay():
+                    self.device.setrelay(False)
+                else:
+                    self.device.setrelay(True)
+            elif msg['body'].find('=')>0:
+                logging.debug('got a control' + str(msg))
+                (variable,value)=msg['body'].split('=')
+                logging.debug('setting %s to %s' % (variable,value))
+                
             else:
                 pass
         else:
@@ -172,7 +186,11 @@ if __name__ == '__main__':
     myDevice = TheDevice(opts.nodeid);
     myDevice._add_field(name="relay", typename="numeric", unit="Bool");
     myDevice._add_field(name="pir", typename="numeric", unit="Bool");
-    
+    myDevice._set_momentary_timestamp("2013-03-07T16:24:30")
+    myDevice._add_field_momentary_data("relay", "0", flags={"automaticReadout": "true"});
+    myDevice._add_field_momentary_data("pir", "0", flags={"automaticReadout": "true"});
+    xmpp.addDevice(myDevice)
+
     xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
     
     xmpp.connect()
