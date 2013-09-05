@@ -122,7 +122,9 @@ if __name__ == '__main__':
     #   "server" an IoT device that can provide sensorinformation
     #   python IoT_TestDevice.py -j "serverjid@yourdomain.com" -p "password" -n "TestIoT" --debug
     #
-    #   "client" an IoT device or other party that would like to get data from another device
+    #   "client" an IoT device or other party that would like to get data from another device every
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --debug
+
     
     optp = OptionParser()
 
