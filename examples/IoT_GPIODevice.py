@@ -126,8 +126,8 @@ class TheDevice(Device):
         the implementation of the refresh method
         """
         self._set_momentary_timestamp(self._get_timestamp())
-        self._add_field_momentary_data(self, "pir", self.getpir()) 
-        self._add_field_momentary_data(self, "relay", self.getrelay()) 
+        self._add_field_momentary_data("pir", self.getpir()) 
+        self._add_field_momentary_data("relay", self.getrelay()) 
 
         
 if __name__ == '__main__':
