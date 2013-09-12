@@ -47,12 +47,20 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
     """
     def __init__(self, jid, password):
         sleekxmpp.ClientXMPP.__init__(self, jid, password)
+
+        self.register_plugin('xep_0030')
+        self.register_plugin('xep_0323')
+        self.register_plugin('xep_0325')
+
         self.add_event_handler("session_start", self.session_start)
         self.add_event_handler("message", self.message)
+        self.add_event_handler("changed_status",self.manage_status)
+
         self.device=None
         self.releaseMe=False
         self.beServer=True
         self.clientJID=None
+        self.received=set()
 
     def datacallback(self,from_jid,result,nodeId=None,timestamp=None,fields=None,error_msg=None):
         """
@@ -69,6 +77,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
             self.beServer=False
             self.clientJID=clientJID
             
+
     def testForRelease(self):
         # todo thread safe
         return self.releaseMe
@@ -79,6 +88,34 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         
     def addDevice(self, device):
         self.device=device
+
+    def printRoster(self):
+        print('Roster for %s' % self.boundjid.bare)
+        groups = self.client_roster.groups()
+        for group in groups:
+            print('\n%s' % group)
+            print('-' * 72)
+            for jid in groups[group]:
+                sub = self.client_roster[jid]['subscription']
+                name = self.client_roster[jid]['name']
+                if self.client_roster[jid]['name']:
+                    print(' %s (%s) [%s]' % (name, jid, sub))
+                else:
+                    print(' %s [%s]' % (jid, sub))
+                    
+                connections = self.client_roster.presence(jid)
+                for res, pres in connections.items():
+                    show = 'available'
+                    if pres['show']:
+                        show = pres['show']
+                    print('   - %s (%s)' % (res, show))
+                    if pres['status']:
+                        print('       %s' % pres['status'])
+
+    def manage_status(self, event):
+        logging.debug("got a status update" + str(event))
+        logging.debug("got a status update" + str(event.getFrom()))
+        self.printRoster()
         
     def session_start(self, event):
         self.send_presence()
@@ -87,7 +124,8 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
 
         if not(self.beServer):
-            session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID,self.datacallback)
+            logging.debug('We are a client start asking %s for values' % self.clientJID)
+            self.schedule('end', 30, self.askClientForValue, repeat=True, kwargs={})
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
@@ -96,6 +134,14 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
             msg.reply("Hi I am " + self.boundjid.full + " and I am on IP " + ip).send()
         else:
             logging.debug("got unknown message type %s", str(msg['type']))
+
+    def askClientForValue(self):
+        #need to find the full jid to call for data
+        connections=self.client_roster.presence(self.clientJID)
+        for res, pres in connections.items():
+            # ask every session on the jid for data
+            session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, flags={"momentary":"true"})
+
             
 class TheDevice(Device):
     """
@@ -111,8 +157,8 @@ class TheDevice(Device):
         the implementation of the refresh method
         """
         self._set_momentary_timestamp(self._get_timestamp())
-        self.counter+=self.counter
-        self._add_field_momentary_data(self, "Temperature", self.counter) 
+        self.counter=self.counter+1
+        self._add_field_momentary_data( "Temperature", self.counter)
         
 if __name__ == '__main__':
 
@@ -163,14 +209,7 @@ if __name__ == '__main__':
     if opts.password is None:
         opts.password = getpass.getpass("Password: ")
         
-
     xmpp = IoT_TestDevice(opts.jid,opts.password)
-    xmpp.register_plugin('xep_0030')
-    #xmpp['xep_0030'].add_feature(feature='urn:xmpp:iot:sensordata',
-    #                             node=None,
-    #    jid=None)
-    xmpp.register_plugin('xep_0323')
-    xmpp.register_plugin('xep_0325')
 
     if opts.nodeid:
 
@@ -181,8 +220,8 @@ if __name__ == '__main__':
         myDevice = TheDevice(opts.nodeid);
         # myDevice._add_field(name="Relay", typename="numeric", unit="Bool");
         myDevice._add_field(name="Temperature", typename="numeric", unit="C");
-        myDevice._set_momentary_timestamp("2013-03-07T16:24:30")
-        myDevice._add_field_momentary_data("Temperature", "23.4", flags={"automaticReadout": "true"});
+        myDevice._set_momentary_timestamp(myDevice._get_timestamp())
+        myDevice._add_field_momentary_data("Temperature", "23.4", flags={"automaticReadout": "true","momentary":"true"});
         
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp.beClientOrServer(server=True)
@@ -190,6 +229,7 @@ if __name__ == '__main__':
             xmpp.connect()
             xmpp.process(block=True)    
             logging.debug("lost connection")
+            
     if opts.sensorjid:
         logging.debug("will try to call another device for data")
         xmpp.beClientOrServer(server=False,clientJID=opts.sensorjid)
