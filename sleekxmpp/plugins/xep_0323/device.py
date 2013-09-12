@@ -114,6 +114,7 @@ class Device(object):
 
 		if "momentary" in flags and flags['momentary'] == "true" or \
 		   "all" in flags and flags['all'] == "true":
+			logging.debug("reporting momentary data")
 			ts_block = {};
 			timestamp = "";
 
@@ -125,6 +126,7 @@ class Device(object):
 			field_block = [];
 			for f in self.momentary_data:
 				if f in fields:
+					logging.debug("grep values f " + f)
 					field_block.append({"name": f, 
 							    "type": self.fields[f]["type"], 
 							    "unit": self.fields[f]["unit"],
@@ -134,6 +136,8 @@ class Device(object):
 			ts_block["timestamp"] = timestamp;
 			ts_block["fields"] = field_block;
 
+			logging.debug("ts block ready "+ str(ts_block))
+
 			callback(session, result="done", nodeId=self.nodeId, timestamp_block=ts_block);
 			return
 
@@ -141,6 +145,7 @@ class Device(object):
 		to_flag = self._datetime_flag_parser(flags, 'to')
 
 		for ts in sorted(self.timestamp_data.keys()):
+			logging.debug("reporting timestamped data")
 			tsdt = datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
 			if not from_flag is None: 
 				if tsdt < from_flag: 
@@ -225,7 +230,7 @@ class Device(object):
 		if not timestamp in self.timestamp_data:
 			self.timestamp_data[timestamp] = {};
 
-		self.timestamp_data[timestamp][name] = {"value": value, "flags": flags};
+		self.timestamp_data[timestamp][name] = {"value": str(value), "flags": flags};
 		return True;
 
 	def _add_field_momentary_data(self, name, value, flags=None):
@@ -238,13 +243,17 @@ class Device(object):
             flags     -- [optional] data classifier flags for the field, e.g. momentary
                          Formatted as a dictionary like { "flag name": "flag value" ... }
 		"""
+                logging.debug('fields'+str(self.fields))
+                logging.debug('momentary' + str(self.momentary_data))
 		if not self.fields.has_key(name):
-			return False;
+                    logging.debug('no field '+ name)
+		    return False;
 		if flags is None:
-			flags = {};
+		    flags = {};
 		
 		flags["momentary"] = "true"
-		self.momentary_data[name] = {"value": value, "flags": flags};
+		self.momentary_data[name] = {"value": str(value), "flags": flags}
+                logging.debug('momentary updated' + str(self.momentary_data))
 		return True;
 
 	def _set_momentary_timestamp(self, timestamp):
