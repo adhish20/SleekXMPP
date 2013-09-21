@@ -10,6 +10,9 @@
     See the file LICENSE for copying permission.
 """
 
+
+
+
 import os
 import sys
 # This can be used when you are in a test environment and need to make paths right
@@ -40,6 +43,8 @@ from sleekxmpp.plugins.xep_0323.device import Device
 
 #from sleekxmpp.exceptions import IqError, IqTimeout
 
+SECONDS_BETEEN_CALLS_TO_PROVIDER = 30 #We will wait seconds between each call to a provider for data 
+
 class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
     """
@@ -66,8 +71,25 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         """
         This method will be called when you ask another IoT device for data with the xep_0323
         se script below for the registration of the callback
+        fields example
+        [{'typename': 'numeric', 'unit': 'C', 'flags': {'momentary': 'true', 'automaticReadout': 'true'}, 'name': 'temperature', 'value': '13.5'},
+        {'typename': 'numeric', 'unit': 'mb', 'flags': {'momentary': 'true', 'automaticReadout': 'true'}, 'name': 'barometer', 'value': '1015.0'},
+        {'typename': 'numeric', 'unit': '%', 'flags': {'momentary': 'true', 'automaticReadout': 'true'}, 'name': 'humidity', 'value': '78.0'}]
         """
-        logging.debug("we got data %s from %s",str(result),from_jid)
+        
+        if error_msg:
+            logging.error('we got problem when recieving data %s', error_msg)
+            return
+        
+        if result=='accepted':
+            logging.debug("we got accepted from %s",from_jid)            
+        elif result=='fields':
+            logging.info("we got fields from %s with node %s",from_jid,nodeId)
+            for field in fields:
+                logging.info("Field %s %s %s",field['name'],field['value'],field['unit'])
+        elif result=='done':
+            logging.debug("we got  done from %s",from_jid)
+        
 
     def beClientOrServer(self,server=True,clientJID=None ):
         if server:
@@ -90,30 +112,29 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.device=device
 
     def printRoster(self):
-        print('Roster for %s' % self.boundjid.bare)
+        logging.debug('Roster for %s' % self.boundjid.bare)
         groups = self.client_roster.groups()
         for group in groups:
-            print('\n%s' % group)
-            print('-' * 72)
+            logging.debug('\n%s' % group)
+            logging.debug('-' * 72)
             for jid in groups[group]:
                 sub = self.client_roster[jid]['subscription']
                 name = self.client_roster[jid]['name']
                 if self.client_roster[jid]['name']:
-                    print(' %s (%s) [%s]' % (name, jid, sub))
+                    logging.debug(' %s (%s) [%s]' % (name, jid, sub))
                 else:
-                    print(' %s [%s]' % (jid, sub))
+                    logging.debug(' %s [%s]' % (jid, sub))
                     
                 connections = self.client_roster.presence(jid)
                 for res, pres in connections.items():
                     show = 'available'
                     if pres['show']:
                         show = pres['show']
-                    print('   - %s (%s)' % (res, show))
+                    logging.debug('   - %s (%s)' % (res, show))
                     if pres['status']:
-                        print('       %s' % pres['status'])
+                        logging.debug('       %s' % pres['status'])
 
     def manage_status(self, event):
-        logging.debug("got a status update" + str(event))
         logging.debug("got a status update" + str(event.getFrom()))
         self.printRoster()
         
@@ -124,12 +145,12 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
 
         if not(self.beServer):
-            logging.debug('We are a client start asking %s for values' % self.clientJID)
-            self.schedule('end', 30, self.askClientForValue, repeat=True, kwargs={})
+            logging.info('We are a client start asking %s for values' % self.clientJID)
+            self.schedule('end', SECONDS_BETEEN_CALLS_TO_PROVIDER, self.askClientForValue, repeat=True, kwargs={})
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
-            logging.debug("got normal chat message" + str(msg))
+            logging.info("got normal chat message" + str(msg))
             ip=urlopen('http://icanhazip.com').read()
             msg.reply("Hi I am " + self.boundjid.full + " and I am on IP " + ip).send()
         else:
@@ -166,9 +187,10 @@ if __name__ == '__main__':
     #
     # This script can act both as
     #   "server" an IoT device that can provide sensorinformation
-    #   python IoT_TestDevice.py -j "serverjid@yourdomain.com" -p "password" -n "TestIoT" --debug
+    #   python IoT_TestDevice.py -j "poviderOfDataDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
     #
-    #   "client" an IoT device or other party that would like to get data from another device
+    #   "client" an IoT device or other party that would like to get data from another device every
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@" --debu
     
     optp = OptionParser()
 

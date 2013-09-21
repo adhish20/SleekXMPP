@@ -610,6 +610,7 @@ class XEP_0323(BasePlugin):
         iq['req']._set_flags(flags);
 
         self.sessions[seqnr] = {"from": iq['from'], "to": iq['to'], "seqnr": seqnr, "callback": callback};
+        logging.info('IoT SEND '+str(iq))
         iq.send(block=False); 
 
         return seqnr;
@@ -664,7 +665,7 @@ class XEP_0323(BasePlugin):
         Received Iq with cancelled - this is a cancel confirm. 
         Delete the session. 
         """
-        #print("Got cancelled")
+        logging.warn('IoT RECIEVE ' + str(iq))
         seqnr = iq['cancelled']['seqnr'];
         callback = self.sessions[seqnr]["callback"];
         callback(from_jid=iq['from'], result="cancelled");
@@ -676,6 +677,7 @@ class XEP_0323(BasePlugin):
         Received Msg with fields - this is a data reponse to a request.
         If this is the last data block, issue a "done" callback.
         """
+        logging.info('IoT RECIEVE ' + str(msg))
         seqnr = msg['fields']['seqnr'];
         callback = self.sessions[seqnr]["callback"];
         for node in msg['fields']['nodes']:
