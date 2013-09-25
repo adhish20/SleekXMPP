@@ -10,11 +10,10 @@
     See the file LICENSE for copying permission.
 """
 
-
-
-
 import os
 import sys
+import socket
+
 # This can be used when you are in a test environment and need to make paths right
 sys.path=['/Users/jocke/Dropbox/06_dev/SleekXMPP']+sys.path
 
@@ -39,17 +38,18 @@ if sys.version_info < (3, 0):
 else:
     raw_input = input
     
-from sleekxmpp.plugins.xep_0323.device import Device
+from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
+from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
 
 #from sleekxmpp.exceptions import IqError, IqTimeout
 
-SECONDS_BETEEN_CALLS_TO_PROVIDER = 30 #We will wait seconds between each call to a provider for data 
 
 class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
     """
-    A simple IoT device that can act as server or client
+    A simple IoT device that can act as server or client both on xep 323 and 325
     """
+    
     def __init__(self, jid, password):
         sleekxmpp.ClientXMPP.__init__(self, jid, password)
 
@@ -61,11 +61,16 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.add_event_handler("message", self.message)
         self.add_event_handler("changed_status",self.manage_status)
 
+        #Some local status variables to use
         self.device=None
         self.releaseMe=False
         self.beServer=True
         self.clientJID=None
+        self.controlJID=None
         self.received=set()
+        self.controlField=None
+        self.controlValue=None
+        self.delayValue=None
 
     def datacallback(self,from_jid,result,nodeId=None,timestamp=None,fields=None,error_msg=None):
         """
@@ -89,16 +94,25 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 logging.info("Field %s %s %s",field['name'],field['value'],field['unit'])
         elif result=='done':
             logging.debug("we got  done from %s",from_jid)
-        
 
-    def beClientOrServer(self,server=True,clientJID=None ):
+    def controlcallback(self,from_jid,result,error_msg,nodeId=None,fields=None):
+        """
+        Called as respons to a xep_0325 control message 
+        """
+        logging.info('Control callback from %s result %s error %s',from_jid,result,error_msg)
+
+    def beClientOrServer(self,server=True,clientJID=None,controlJID=None,controlField=None,controlValue=None ):
         if server:
             self.beServer=True
             self.clientJID=None
+        elif clientJID:
+            self.beServer=False
+            self.clientJID=clientJID            
         else:
             self.beServer=False
-            self.clientJID=clientJID
-            
+            self.controlJID=controlJID
+            self.controlField=controlField
+            self.controlValue=controlValue
 
     def testForRelease(self):
         # todo thread safe
@@ -145,14 +159,19 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
 
         if not(self.beServer):
-            logging.info('We are a client start asking %s for values' % self.clientJID)
-            self.schedule('end', SECONDS_BETEEN_CALLS_TO_PROVIDER, self.askClientForValue, repeat=True, kwargs={})
+            if self.clientJID:
+                logging.info('We are a client start asking %s for values' % self.clientJID)
+                self.schedule('end', self.delayValue, self.askClientForValue, repeat=True, kwargs={})
+            elif self.controlJID:
+                logging.info('We are a control client set field %s to value %s on %s',self.controlField,self.controlValue, self.controlJID)
+                self.schedule('end', self.delayValue, self.sendControlMessage, repeat=True, kwargs={})
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
             logging.info("got normal chat message" + str(msg))
-            ip=urlopen('http://icanhazip.com').read()
-            msg.reply("Hi I am " + self.boundjid.full + " and I am on IP " + ip).send()
+            internetip=urlopen('http://icanhazip.com').read()
+            localip=socket.gethostbyname(socket.gethostname())
+            msg.reply("Hi I am " + self.boundjid.full + " and I am on localIP " +localip +" and on internet " + internetip).send()
         else:
             logging.debug("got unknown message type %s", str(msg['type']))
 
@@ -163,15 +182,26 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
             # ask every session on the jid for data
             session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, flags={"momentary":"true"})
 
+    def sendControlMessage(self):
+        #need to find the full jid to call for data
+        connections=self.client_roster.presence(self.controlJID)
+        for res, pres in connections.items():
+            # ask every session on the jid for data
+            session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("Relay","boolean","1")])
             
-class TheDevice(Device):
+class TheDevice(SensorDevice,ControlDevice):
     """
+    Xep 323
     This is the actual device object that you will use to get information from your real hardware
     You will be called in the refresh method when someone is requesting information from you
+
+    xep 325
+    This 
     """
     def __init__(self,nodeId):
-        Device.__init__(self,nodeId)
+        SensorDevice.__init__(self,nodeId)
         self.counter=0
+        self.relay=0
 
     def refresh(self,fields):
         """
@@ -179,18 +209,30 @@ class TheDevice(Device):
         """
         self._set_momentary_timestamp(self._get_timestamp())
         self.counter=self.counter+1
-        self._add_field_momentary_data( "Temperature", self.counter)
+        self._add_field_momentary_data("Counter", self.counter)
+        self._add_field_momentary_data("Relay", self.relay)
+
+
+
         
 if __name__ == '__main__':
 
     # Setup the command line arguments.
     #
-    # This script can act both as
+    # This script can for xep 323 act both as
     #   "server" an IoT device that can provide sensorinformation
     #   python IoT_TestDevice.py -j "poviderOfDataDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
     #
-    #   "client" an IoT device or other party that would like to get data from another device every
-    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --debug
+    #   "client" an IoT device or other party that would like to get data from another device every minute
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --delay 60 --debug
+    #
+    # This script can for xep 325 act both as
+    #   "server" an IoT device that can recieve a control command and act upon it
+    #   python IoT_TestDevice.py -j "poviderOfControlDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
+    #
+    #   "client" an IoT device or other party that would like to send a control message to a field in another device every 60 minute
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --field "Relay" --value "1" --delay 60 --debug
+
     
     optp = OptionParser()
 
@@ -215,10 +257,18 @@ if __name__ == '__main__':
                     help="password to use")
 
     # IoT test
-    optp.add_option("-c", "--sensorjid", dest="sensorjid",
-                    help="Another device to call for data on", default=None)
     optp.add_option("-n", "--nodeid", dest="nodeid",
-                    help="I am a device get ready to be called", default=None)
+                    help="Server (Provider) I am a device that can be called for data or send control to", default=None)
+    optp.add_option("-g", "--getsensorjid", dest="getsensorjid",
+                    help="Device to call for data on", default=None)
+    optp.add_option("-c", "--controljid", dest="controljid",
+                    help="Device to call for data on", default=None)
+    optp.add_option("--field", dest="controlfield",
+                    help="Field to act upon", default=None)
+    optp.add_option("--value", dest="controlvalue",
+                    help="control value", default=None)
+    optp.add_option("--delay", dest="delayvalue",
+                    help="secondsdelay between reads or controls", default=30)
     
     opts, args = optp.parse_args()
 
@@ -232,18 +282,22 @@ if __name__ == '__main__':
         opts.password = getpass.getpass("Password: ")
         
     xmpp = IoT_TestDevice(opts.jid,opts.password)
-
+    xmpp.delayValue=int(opts.delayvalue)
+    logging.debug("DELAY " + str(int(opts.delayvalue)) + "  " + str(xmpp.delayValue))
+    
     if opts.nodeid:
-
+        # prepare the IoT_TestDevice to be a provider of data and be able to recieve control commands
         # xmpp['xep_0030'].add_feature(feature='urn:xmpp:sn',
         # node=opts.nodeid,
         # jid=xmpp.boundjid.full)
 
+        # Instansiate the device object
         myDevice = TheDevice(opts.nodeid);
-        # myDevice._add_field(name="Relay", typename="numeric", unit="Bool");
-        myDevice._add_field(name="Temperature", typename="numeric", unit="C");
+        myDevice._add_field(name="Relay", typename="numeric", unit="Bool");
+        myDevice._add_field(name="Counter", typename="numeric", unit="Count");
         myDevice._set_momentary_timestamp(myDevice._get_timestamp())
-        myDevice._add_field_momentary_data("Temperature", "23.4", flags={"automaticReadout": "true","momentary":"true"});
+        myDevice._add_field_momentary_data("Counter", "0", flags={"automaticReadout": "true","momentary":"true"});
+        myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true"});
         
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp.beClientOrServer(server=True)
@@ -252,13 +306,21 @@ if __name__ == '__main__':
             xmpp.process(block=True)    
             logging.debug("lost connection")
             
-    if opts.sensorjid:
+    elif opts.getsensorjid:
         logging.debug("will try to call another device for data")
-        xmpp.beClientOrServer(server=False,clientJID=opts.sensorjid)
+        xmpp.beClientOrServer(server=False,clientJID=opts.getsensorjid)
+        xmpp.delayvalue=opts.delayvalue
         xmpp.connect()
         xmpp.process(block=True)
         logging.debug("ready ending")
-        
+
+    elif opts.controljid:
+        logging.debug("will try to send control message to another device")
+        xmpp.beClientOrServer(server=False,controlJID=opts.controljid,controlField=opts.controlfield,controlValue=opts.controlvalue)
+        xmpp.delayvalue=opts.delayvalue
+        xmpp.connect()
+        xmpp.process(block=True)
+        logging.debug("ready ending")
     else:
        print "noopp didn't happen"
 

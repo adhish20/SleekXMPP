@@ -148,7 +148,10 @@ class ControlSet(ElementBase):
                 dataObj = LongParameter(parent=self);
             elif typename == "time":
                 dataObj = TimeParameter(parent=self);
-
+            else:
+                #unsupported datatype
+                raise Exception('Unsupported data type ' + typename)
+                
             dataObj['name'] = name;
             dataObj['value'] = value;
 
