@@ -71,6 +71,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.controlField=None
         self.controlValue=None
         self.delayValue=None
+        self.toggle=0
 
     def datacallback(self,from_jid,result,nodeId=None,timestamp=None,fields=None,error_msg=None):
         """
@@ -95,7 +96,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         elif result=='done':
             logging.debug("we got  done from %s",from_jid)
 
-    def controlcallback(self,from_jid,result,error_msg,nodeId=None,fields=None):
+    def controlcallback(self,from_jid,result,error_msg,nodeIds=None,fields=None):
         """
         Called as respons to a xep_0325 control message 
         """
@@ -163,21 +164,25 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 logging.info('We are a client start asking %s for values' % self.clientJID)
                 self.schedule('end', self.delayValue, self.askClientForValue, repeat=True, kwargs={})
             elif self.controlJID:
-                logging.info('We are a control client set field %s to value %s on %s',self.controlField,self.controlValue, self.controlJID)
+                logging.info('We are a control client set field %s to value %s on %s every %s',self.controlField,self.controlValue, self.controlJID, self.delayValue)
                 self.schedule('end', self.delayValue, self.sendControlMessage, repeat=True, kwargs={})
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
-            logging.info("got normal chat message" + str(msg))
-            internetip=urlopen('http://icanhazip.com').read()
-            localip=socket.gethostbyname(socket.gethostname())
-            msg.reply("Hi I am " + self.boundjid.full + " and I am on localIP " +localip +" and on internet " + internetip).send()
+            if msg['body'].startswith('hi'):
+                logging.info("got normal chat message" + str(msg))
+                internetip=urlopen('http://icanhazip.com').read()
+                localip=socket.gethostbyname(socket.gethostname())
+                msg.reply("I am " + self.boundjid.full + " and I am on localIP " +localip +" and on internet " + internetip).send()
+            else:
+                logging.debug('message dropped ' +  msg['body'])
         else:
             logging.debug("got unknown message type %s", str(msg['type']))
 
     def askClientForValue(self):
         #need to find the full jid to call for data
         connections=self.client_roster.presence(self.clientJID)
+        logging.debug('IoT will call for data to '+ str(connections))
         for res, pres in connections.items():
             # ask every session on the jid for data
             session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, flags={"momentary":"true"})
@@ -185,23 +190,37 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
     def sendControlMessage(self):
         #need to find the full jid to call for data
         connections=self.client_roster.presence(self.controlJID)
+        logging.debug('IoT will send control to '+ str(connections))
         for res, pres in connections.items():
             # ask every session on the jid for data
-            session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("Relay","boolean","1")])
+            if not self.controlField:
+                #no fields provided default to toggle a relay:
+                if self.toggle:
+                    self.toggle=0
+                    # session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","true")])
+                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","1")])
+                else:
+                    self.toggle=1
+                    # session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","false")])
+                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","0")])
+            else:
+                session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[(self.controlField,"boolean",self.controlValue)])
             
 class TheDevice(SensorDevice,ControlDevice):
     """
-    Xep 323
+    Xep 323 SensorDevice
     This is the actual device object that you will use to get information from your real hardware
     You will be called in the refresh method when someone is requesting information from you
 
-    xep 325
+    xep 325 ControlDevice
     This 
     """
     def __init__(self,nodeId):
         SensorDevice.__init__(self,nodeId)
+        ControlDevice.__init__(self,nodeId)
         self.counter=0
         self.relay=0
+
 
     def refresh(self,fields):
         """
@@ -212,8 +231,24 @@ class TheDevice(SensorDevice,ControlDevice):
         self._add_field_momentary_data("Counter", self.counter)
         self._add_field_momentary_data("Relay", self.relay)
 
-
-
+    def _set_field_value(self, name,value):
+        """ overrides the set field value from device to act on my local values                                            
+        """
+        if name=="Toggle":
+            if self.device.getrelay():
+                self.device.setrelay(False)
+            else:
+                self.device.setrelay(True)
+                self._set_momentary_timestamp(self._get_timestamp())
+            self._add_field_momentary_data("Relay", self.relay)
+        elif name=="Relay":
+            self.relay=int(value)
+            self._set_momentary_timestamp(self._get_timestamp())
+            self._add_field_momentary_data("Relay", self.relay)
+        elif name=="Counter":
+            self.counter=int(value)
+            self._set_momentary_timestamp(self._get_timestamp())
+            self._add_field_momentary_data("Counter", self.counter)
         
 if __name__ == '__main__':
 
@@ -294,12 +329,14 @@ if __name__ == '__main__':
         # Instansiate the device object
         myDevice = TheDevice(opts.nodeid);
         myDevice._add_field(name="Relay", typename="numeric", unit="Bool");
+        myDevice._add_control_field(name="Relay", typename="numeric", value=1);
         myDevice._add_field(name="Counter", typename="numeric", unit="Count");
         myDevice._set_momentary_timestamp(myDevice._get_timestamp())
         myDevice._add_field_momentary_data("Counter", "0", flags={"automaticReadout": "true","momentary":"true"});
         myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true"});
         
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
+        xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp.beClientOrServer(server=True)
         while not(xmpp.testForRelease()):
             xmpp.connect()
@@ -309,7 +346,6 @@ if __name__ == '__main__':
     elif opts.getsensorjid:
         logging.debug("will try to call another device for data")
         xmpp.beClientOrServer(server=False,clientJID=opts.getsensorjid)
-        xmpp.delayvalue=opts.delayvalue
         xmpp.connect()
         xmpp.process(block=True)
         logging.debug("ready ending")
@@ -317,7 +353,6 @@ if __name__ == '__main__':
     elif opts.controljid:
         logging.debug("will try to send control message to another device")
         xmpp.beClientOrServer(server=False,controlJID=opts.controljid,controlField=opts.controlfield,controlValue=opts.controlvalue)
-        xmpp.delayvalue=opts.delayvalue
         xmpp.connect()
         xmpp.process(block=True)
         logging.debug("ready ending")
