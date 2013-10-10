@@ -167,8 +167,8 @@ class XEP_0323(BasePlugin):
     def post_init(self):
         """ Init complete. Register our features in Serivce discovery. """
         BasePlugin.post_init(self)
-        self.xmpp['xep_0030'].add_feature(Sensordata.namespace)
-        self.xmpp['xep_0030'].set_items(node=Sensordata.namespace, items=tuple())
+        # self.xmpp['xep_0030'].add_feature(Sensordata.namespace)
+        # self.xmpp['xep_0030'].set_items(node=Sensordata.namespace, items=tuple())
 
     def _new_session(self):
         """ Return a new session ID. """

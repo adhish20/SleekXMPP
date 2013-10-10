@@ -10,6 +10,7 @@
 """
 
 import sys
+sys.path=['/Users/jocke/Dropbox/06_dev/SleekXMPP']+sys.path
 import logging
 import getpass
 from optparse import OptionParser

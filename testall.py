@@ -2,6 +2,7 @@
 
 import os
 import sys
+# This can be used when you are in a test environment and need to make paths right
 sys.path=['/Users/jocke/Dropbox/06_dev/SleekXMPP']+sys.path
 
 import logging
@@ -13,7 +14,7 @@ from glob import glob
 from os.path import splitext, basename, join as pjoin
 
 
-def run_tests(exlude=None, include=[]):
+def run_tests(exlude=[], include=[]):
     """
     Find and run all tests in the tests/ directory.
 
@@ -21,10 +22,13 @@ def run_tests(exlude=None, include=[]):
     """
     testfiles = ['tests.test_overall']
     exclude = ['__init__.py', 'test_overall.py']
+
+    #find all testcases that is not part of the exclude list
     for t in glob(pjoin('tests', '*.py')):
         if True not in [t.endswith(ex) for ex in exclude]:
             if basename(t).startswith('test_'):
                 testfiles.append('tests.%s' % splitext(basename(t))[0])
+
     testsToUse=[]
     if not(include==[]):
         # use only test that has any text include in them
@@ -34,7 +38,6 @@ def run_tests(exlude=None, include=[]):
                     # add the test'
                     # print "REMOVE "+match + " test " + test + "  " + str(test.find(match))
                     testsToUse.append(test)
-
 
     testfiles=testsToUse
     suites = []
@@ -48,6 +51,8 @@ def run_tests(exlude=None, include=[]):
     # Disable logging output
     logging.basicConfig(level=100)
     logging.disable(100)
+    #logging.basicConfig(level=1)
+    #logging.disable(100)
 
     result = runner.run(tests)
     return result
@@ -70,7 +75,11 @@ class TestCommand(distutils.core.Command):
 
 
 if __name__ == '__main__':
+#    result = run_tests(include=['all'])
     result = run_tests(include=['323'])
+#    result = run_tests(include=['323','325'])
+#    result = run_tests(include=['325'])
+
     print("<tests %s ran='%s' errors='%s' fails='%s' success='%s' />" % (
         "xmlns='http//andyet.net/protocol/tests'",
         result.testsRun, len(result.errors),

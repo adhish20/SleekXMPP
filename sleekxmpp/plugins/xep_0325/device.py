@@ -34,8 +34,10 @@ class Device(object):
             field      -- The field name		
             typename   -- The expected type
 		"""
-		if field in self.control_fields and self.control_fields[field]["type"] == typename:
-			return True;
+		if self.control_fields.has_key(field):
+                   if self.control_fields[field]["type"]==typename:
+			   return True;
+		
 		return False;
 
 	def set_control_fields(self, fields, session, callback):

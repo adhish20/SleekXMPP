@@ -243,11 +243,13 @@ class Device(object):
             flags     -- [optional] data classifier flags for the field, e.g. momentary
                          Formatted as a dictionary like { "flag name": "flag value" ... }
 		"""
+
                 logging.debug('fields'+str(self.fields))
                 logging.debug('momentary' + str(self.momentary_data))
 		if not self.fields.has_key(name):
                     logging.debug('no field '+ name)
 		    return False;
+
 		if flags is None:
 		    flags = {};
 		
