@@ -9,6 +9,7 @@
 """
 
 import datetime
+import logging
 
 class Device(object):
 	"""
@@ -111,6 +112,7 @@ class Device(object):
             value    -- New value for the field
 		"""
 		if name in self.control_fields:
+			logging.debug("IoT control value %s %s",name,str(value))
 			self.control_fields[name]["value"] = value;
 
 	def _get_field_value(self, name):
