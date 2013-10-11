@@ -9,7 +9,7 @@
 
     See the file LICENSE for copying permission.
 
-    This eables The GPIO on a raspnberry to be used as XMPP sensors
+    This eables The GPIO on a raspberry to be used as XMPP sensors
     the example is done with http://wiki.sweetpeas.se/index.php?title=Rpi_labbkitt 
 
     Must be run with root privileges to be able access GPIO
@@ -42,7 +42,9 @@ if sys.version_info < (3, 0):
 else:
     raw_input = input
     
-from sleekxmpp.plugins.xep_0323.device import Device
+
+from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
+from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
 import RPi.GPIO as GPIO
 
 class IoT_TestDevice(sleekxmpp.ClientXMPP):
@@ -54,6 +56,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         sleekxmpp.ClientXMPP.__init__(self, jid, password)
         self.add_event_handler("session_start", self.session_start)
         self.add_event_handler("message", self.message)
+        self.add_event_handler("setReq", self.message)
         self.device=None
         self.releaseMe=False
         self.beServer=True
@@ -72,6 +75,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
+            # we are in a chat with a friend create an easy dialog
             logging.debug("got normal chat message" + str(msg))
             if msg['body'].startswith('hi'):
                 ip=urlopen('http://icanhazip.com').read()
@@ -100,14 +104,15 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
 RELAY=18
 PIR=16
             
-class TheDevice(Device):
+class TheDevice(SensorDevice,ControlDevice):
     """
     This is the actual device object that you will use to get information from your real hardware
     You will be called in the refresh method when someone is requesting information from you
     """
 
     def __init__(self,nodeId):
-        Device.__init__(self,nodeId)
+        SensorDevice.__init__(self,nodeId)
+        ControlDevice.__init__(self,nodeId)
 
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(PIR,GPIO.IN)
@@ -126,9 +131,29 @@ class TheDevice(Device):
         the implementation of the refresh method
         """
         self._set_momentary_timestamp(self._get_timestamp())
-        self._add_field_momentary_data("pir", self.getpir()) 
-        self._add_field_momentary_data("relay", self.getrelay()) 
+        if self.getpir():
+            self._add_field_momentary_data("pir", 'true')
+        else:
+            self._add_field_momentary_data("pir", 'false')
 
+        if self.getrelay():
+            self._add_field_momentary_data("relay", 'true')
+        else:
+            self._add_field_momentary_data("relay", 'false')
+
+    def _set_field_value(self, name,value):
+        """ overrides the set field value from device to act on my local values
+        """
+        if name=="relay":
+            if value=='true':
+                self.setrelay(True)
+            else:
+                self.setrelay(False)
+        elif name=="toggle":
+            if self.getrelay():
+                self.setrelay(False)
+            else:
+                self.setrelay(True)
         
 if __name__ == '__main__':
 
@@ -183,15 +208,22 @@ if __name__ == '__main__':
     xmpp.register_plugin('xep_0323')
     xmpp.register_plugin('xep_0325')
 
+
     myDevice = TheDevice(opts.nodeid);
-    myDevice._add_field(name="relay", typename="numeric", unit="Bool");
-    myDevice._add_field(name="pir", typename="numeric", unit="Bool");
+
+    xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10)
+    xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10)
+
+    myDevice._add_field(name="relay", typename="boolean", unit="Bool")
+    myDevice._add_control_field(name="relay", typename="boolean",value="false");
+    myDevice._add_control_field(name="toggle", typename="boolean",value="false");
+    myDevice._add_field(name="pir", typename="boolean", unit="Bool");
     myDevice._set_momentary_timestamp("2013-03-07T16:24:30")
-    myDevice._add_field_momentary_data("relay", "0", flags={"automaticReadout": "true"});
-    myDevice._add_field_momentary_data("pir", "0", flags={"automaticReadout": "true"});
+    myDevice._add_field_momentary_data("relay", "false", flags={"automaticReadout": "true"})
+    myDevice._add_field_momentary_data("pir", "false", flags={"automaticReadout": "true"})
     xmpp.addDevice(myDevice)
 
-    xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
+
     
     xmpp.connect()
     xmpp.process(block=True)    
