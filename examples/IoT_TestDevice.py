@@ -190,20 +190,22 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
     def sendControlMessage(self):
         #need to find the full jid to call for data
         connections=self.client_roster.presence(self.controlJID)
-        logging.debug('IoT will send control to '+ str(connections))
         for res, pres in connections.items():
             # ask every session on the jid for data
             if not self.controlField:
                 #no fields provided default to toggle a relay:
                 if self.toggle:
                     self.toggle=0
-                    # session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","true")])
-                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","1")])
+                    logging.info('IoT will send relay true to '+ str(connections))
+                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","true")])
+                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","true")])
                 else:
                     self.toggle=1
-                    # session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","false")])
-                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","0")])
+                    logging.info('IoT will send relay false to '+ str(connections))
+                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","false")])
+                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","false")])
             else:
+                logging.info('IoT will set %s to %s on to %s'%(self.controlField,self.controlValue,str(connections)))
                 session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[(self.controlField,"boolean",self.controlValue)])
             
 class TheDevice(SensorDevice,ControlDevice):
