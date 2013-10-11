@@ -147,12 +147,17 @@ class XEP_0325(BasePlugin):
     def post_init(self):
         """ Init complete. Register our features in Serivce discovery. """
         BasePlugin.post_init(self)
-        self.xmpp['xep_0030'].add_feature(Control.namespace)
-        self.xmpp['xep_0030'].set_items(node=Control.namespace, items=tuple())
+        #self.xmpp['xep_0030'].add_feature(Control.namespace)
+        #self.xmpp['xep_0030'].set_items(node=Control.namespace, items=tuple())
 
     def _new_session(self):
         """ Return a new session ID. """
         return str(time.time()) + '-' + self.xmpp.new_id()
+
+    def session_bind(self, jid):
+        logging.debug("setting the Disco discovery for %s" % Control.namespace)
+        self.xmpp['xep_0030'].add_feature(Control.namespace)
+        self.xmpp['xep_0030'].set_items(node=Control.namespace, items=tuple())
 
     def plugin_end(self):
         """ Stop the XEP-0325 plugin """
