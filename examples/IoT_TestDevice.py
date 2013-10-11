@@ -102,6 +102,12 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         """
         logging.info('Control callback from %s result %s error %s',from_jid,result,error_msg)
 
+    def getformcallback(self,from_jid,result,error_msg):    
+        """
+        called as respons to a xep_0325 get Form iq message
+        """
+        logging.debug("IoT got a form "+str(result))
+        
     def beClientOrServer(self,server=True,clientJID=None,controlJID=None,controlField=None,controlValue=None ):
         if server:
             self.beServer=True
@@ -192,6 +198,8 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         connections=self.client_roster.presence(self.controlJID)
         for res, pres in connections.items():
             # ask every session on the jid for data
+            session=self['xep_0325'].get_form(self.boundjid.full,self.controlJID+"/"+res,self.getformcallback)
+
             if not self.controlField:
                 #no fields provided default to toggle a relay:
                 if self.toggle:

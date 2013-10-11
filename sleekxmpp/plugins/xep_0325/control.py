@@ -115,25 +115,35 @@ class XEP_0325(BasePlugin):
         """ Start the XEP-0325 plugin """
 
         self.xmpp.register_handler(
-                Callback('Control Event:DirectSet',
-                    StanzaPath('message/set'),
-                    self._handle_direct_set))
+            Callback('Control Event:DirectSet',
+                     StanzaPath('message/set'),
+                     self._handle_direct_set))
 
         self.xmpp.register_handler(
-                Callback('Control Event:SetReq',
-                    StanzaPath('iq@type=set/set'),
-                    self._handle_set_req))
+            Callback('Control Event:SetReq',
+                     StanzaPath('iq@type=set/set'),
+                     self._handle_set_req))
 
         self.xmpp.register_handler(
-                Callback('Control Event:SetResponse',
-                    StanzaPath('iq@type=result/setResponse'),
-                    self._handle_set_response))
+            Callback('Control Event:SetResponse',
+                     StanzaPath('iq@type=result/setResponse'),
+                     self._handle_set_response))
 
         self.xmpp.register_handler(
-                Callback('Control Event:SetResponseError',
+            Callback('Control Event:SetResponseError',
                     StanzaPath('iq@type=error/setResponse'),
                     self._handle_set_response))
 
+        self.xmpp.register_handler(
+            Callback('Control Event:GetForm',
+                     StanzaPath('iq@type=get/getForm'),
+                     self._handle_get_form))
+
+        self.xmpp.register_handler(
+            Callback('Control Event:GetFormResponse',
+                     StanzaPath('iq@type=result/getFormResponse'),
+                     self._handle_get_form_response))
+        
         # Server side dicts
         self.nodes = {};
         self.sessions = {};
@@ -166,6 +176,7 @@ class XEP_0325(BasePlugin):
         self.xmpp.remove_handler('Control Event:SetReq')
         self.xmpp.remove_handler('Control Event:SetResponse')
         self.xmpp.remove_handler('Control Event:SetResponseError')
+        self.xmpp.remove_handler('Control Event:GetForm')
         self.xmpp['xep_0030'].del_feature(feature=Control.namespace)
         self.xmpp['xep_0030'].set_items(node=Control.namespace, items=tuple());
 
@@ -344,8 +355,21 @@ class XEP_0325(BasePlugin):
                 #print("started thread")
             else:
                 self._threaded_node_request(session, process_fields);
+                
+    def _handle_get_form(self, iq):
+        """
+        Event handler for reception of an Iq with getForm which is a request for a description of the
+        control content in the device
+        """
+        # Authentication
+        if len(self.test_authenticated_from) > 0 and not iq['from'] == self.test_authenticated_from:
+            # Invalid authentication
+            req_ok = False;
+            error_msg = "Access denied";
 
+        # create the form contents
 
+        
     def _threaded_node_request(self, session, process_fields):
         """ 
         Helper function to handle the device control in a separate thread.
@@ -562,7 +586,6 @@ class XEP_0325(BasePlugin):
 
     def _handle_set_response(self, iq):
         """ Received response from device(s) """
-        #print("ooh")
         seqnr = iq['id'];
         from_jid = str(iq['from']);
         result = iq['setResponse']['responseCode'];
@@ -576,4 +599,26 @@ class XEP_0325(BasePlugin):
         callback = self.sessions[seqnr]["callback"];
         callback(from_jid=from_jid, result=result, nodeIds=nodeIds, fields=fields, error_msg=error_msg);
 
+    def get_form(self,from_jid, to_jid, callback):
+        """
+        Called on the client side to send a getForm to a device to ask for the supported control fields
+        Callback will be called with the resulting form data from the device
+        """
+        iq = self.xmpp.Iq();
+        iq['from'] = from_jid;
+        iq['to'] = to_jid;
+        seqnr = self._get_new_seqnr();
+        iq['id'] = seqnr;
+        iq['type'] = "getForm";
+        
+        self.sessions[seqnr] = {"from": iq['from'], "to": iq['to'], "callback": callback};
+        iq.send(block=False); 
+        
+    def _handle_get_form_response(self, iq):
+        """ Received response from device(s) """
+        pass
+        
+        
     
+    
+        
