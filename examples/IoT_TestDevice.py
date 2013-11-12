@@ -191,7 +191,10 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         logging.debug('IoT will call for data to '+ str(connections))
         for res, pres in connections.items():
             # ask every session on the jid for data
-            session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, flags={"momentary":"true"})
+            if self.controlField:
+                session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, fields=[self.controlField],flags={"momentary":"true"})
+            else:
+                session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, flags={"momentary":"true"})
 
     def sendControlMessage(self):
         #need to find the full jid to call for data
