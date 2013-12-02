@@ -208,13 +208,15 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 if self.toggle:
                     self.toggle=0
                     logging.info('IoT will send relay true to '+ str(connections))
-                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","true")])
-                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","true")])
+                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","1")])
+                    session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","true")])
+                    #session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","true")])
                 else:
                     self.toggle=1
                     logging.info('IoT will send relay false to '+ str(connections))
-                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","false")])
-                    session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","false")])
+                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","0")])
+                    session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","false")])
+                    #session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","false")])
             else:
                 logging.info('IoT will set %s to %s on to %s'%(self.controlField,self.controlValue,str(connections)))
                 session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[(self.controlField,"boolean",self.controlValue)])
@@ -272,7 +274,7 @@ if __name__ == '__main__':
     #   python IoT_TestDevice.py -j "poviderOfDataDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
     #
     #   "client" an IoT device or other party that would like to get data from another device every minute
-    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --delay 60 --debug
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --delay 60 --debug
     #
     # This script can for xep 325 act both as
     #   "server" an IoT device that can recieve a control command and act upon it
