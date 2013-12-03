@@ -15,7 +15,7 @@ import sys
 import socket
 
 # This can be used when you are in a test environment and need to make paths right
-sys.path=['/Users/jocke/Dropbox/06_dev/SleekXMPP']+sys.path
+sys.path=[os.path.join(os.path.dirname(__file__), '..')]+sys.path
 
 import logging
 import unittest
