@@ -19,7 +19,7 @@
 import os
 import sys
 # This can be used when you are in a test environment and need to make paths right
-sys.path=['/home/pi//SleekXMPP']+sys.path
+sys.path=[os.path.join(os.path.dirname(__file__), '..')]+sys.path
 
 import logging
 import unittest
