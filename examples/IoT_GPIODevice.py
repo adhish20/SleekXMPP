@@ -18,6 +18,7 @@
 
 import os
 import sys
+
 # This can be used when you are in a test environment and need to make paths right
 sys.path=[os.path.join(os.path.dirname(__file__), '..')]+sys.path
 
@@ -46,6 +47,20 @@ else:
 from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
 from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
 import RPi.GPIO as GPIO
+
+def getserial():
+    # Extract serial from cpuinfo file on the raspberry cpuserial = "0000000000000000"
+    try:
+        with open('/proc/cpuinfo', 'r') as content_file:
+            line = content_file.readline()
+            while	line<>'':
+                if line[0:6]=='Serial':
+                    cpuserial = line[10:26]
+                    return cpuserial
+            line = content_file.readline()
+    except:
+        cpuserial = "ERROR000000000"
+    return cpuserial
 
 class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
@@ -208,7 +223,6 @@ if __name__ == '__main__':
     xmpp.register_plugin('xep_0323')
     xmpp.register_plugin('xep_0325')
 
-
     myDevice = TheDevice(opts.nodeid);
 
     xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10)
@@ -223,8 +237,6 @@ if __name__ == '__main__':
     myDevice._add_field_momentary_data("pir", "false", flags={"automaticReadout": "true"})
     xmpp.addDevice(myDevice)
 
-
-    
     xmpp.connect()
     xmpp.process(block=True)    
     logging.debug("lost connection")

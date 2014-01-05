@@ -56,6 +56,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.register_plugin('xep_0030')
         self.register_plugin('xep_0323')
         self.register_plugin('xep_0325')
+        self.register_plugin('xep_0199') # XMPP ping
 
         self.add_event_handler("session_start", self.session_start)
         self.add_event_handler("message", self.message)
@@ -280,9 +281,11 @@ if __name__ == '__main__':
     #   "server" an IoT device that can recieve a control command and act upon it
     #   python IoT_TestDevice.py -j "poviderOfControlDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
     #
-    #   "client" an IoT device or other party that would like to send a control message to a field in another device every 60 minute
-    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --field "Relay" --value "1" --delay 60 --debug
-
+    #   "client" an IoT device or other party that would like to send a control message to a field in another device every 60 second
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --field "relay" --value "1" --delay 60 --debug
+    #
+    #   "client" an IoT device, special case that will toggle the relay every 6 second
+    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --delay 6 --debug
     
     optp = OptionParser()
 
