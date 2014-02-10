@@ -93,7 +93,10 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         elif result=='fields':
             logging.info("we got fields from %s with node %s",from_jid,nodeId)
             for field in fields:
-                logging.info("Field %s %s %s",field['name'],field['value'],field['unit'])
+                if field.has_key('unit'):
+                    logging.info("Field %s %s %s",field['name'],field['value'],field['unit'])
+                else:
+                    logging.info("Field %s %s",field['name'],field['value'])
         elif result=='done':
             logging.debug("we got  done from %s",from_jid)
 
@@ -181,6 +184,21 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 internetip=urlopen('http://icanhazip.com').read()
                 localip=socket.gethostbyname(socket.gethostname())
                 msg.reply("I am " + self.boundjid.full + " and I am on localIP " +localip +" and on internet " + internetip).send()
+            elif msg['body'].startswith('?'):
+                logging.debug('got a question ' + str(msg))
+                self.device.refresh([])
+                logging.debug('momentary values' + str(self.device.momentary_data))
+                msg.reply(str(self.device.momentary_data)).send()
+            elif msg['body'].startswith('T'):
+                logging.debug('got a toggle ' + str(msg))
+                if self.device.getrelay():
+                    self.device.setrelay(False)
+                else:
+                    self.device.setrelay(True)
+            elif msg['body'].find('=')>0:
+                logging.debug('got a control' + str(msg))
+                (variable,value)=msg['body'].split('=')
+                logging.debug('setting %s to %s' % (variable,value))
             else:
                 logging.debug('message dropped ' +  msg['body'])
         else:
@@ -202,7 +220,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         connections=self.client_roster.presence(self.controlJID)
         for res, pres in connections.items():
             # ask every session on the jid for data
-            session=self['xep_0325'].get_form(self.boundjid.full,self.controlJID+"/"+res,self.getformcallback)
+            # session=self['xep_0325'].get_form(self.boundjid.full,self.controlJID+"/"+res,self.getformcallback)
 
             if not self.controlField:
                 #no fields provided default to toggle a relay:
@@ -356,10 +374,10 @@ if __name__ == '__main__':
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp.beClientOrServer(server=True)
-        while not(xmpp.testForRelease()):
-            xmpp.connect()
-            xmpp.process(block=True)    
-            logging.debug("lost connection")
+        # while not(xmpp.testForRelease()):
+        xmpp.connect()
+        xmpp.process(block=True)    
+        logging.debug("lost connection")
             
     elif opts.getsensorjid:
         logging.debug("will try to call another device for data")
