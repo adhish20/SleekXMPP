@@ -133,23 +133,17 @@ if __name__ == '__main__':
 
     # Setup the command line arguments.
     #
-    # This script can for xep 323 act both as
-    #   "server" an IoT device that can provide sensorinformation
-    #   python IoT_TestDevice.py -j "poviderOfDataDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
-    #
-    #   "client" an IoT device or other party that would like to get data from another device every minute
-    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --delay 60 --debug
-    #
-    # This script can for xep 325 act both as
-    #   "server" an IoT device that can recieve a control command and act upon it
-    #   python IoT_TestDevice.py -j "poviderOfControlDevicedJID@yourdomain.com" -p "password" -n "TestIoT" --debug
-    #
-    #   "client" an IoT device or other party that would like to send a control message to a field in another device every 60 second
-    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --field "relay" --value "1" --delay 60 --debug
-    #
-    #   "client" an IoT device, special case that will toggle the relay every 6 second
-    #   python IoT_TestDevice.py -j "loginJID@yourdomain.com" -p "password" -c "clienttocallfordata@yourdomain.com" --delay 6 --debug
-    
+    # This script is used to make readouts with the use of the xep 323
+    #  Do a full readout once
+    #  python IoT_Xep323ClientRead.py  -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --debug
+    #  full readout every 30 sek the repeted delay can be used on all calls
+    #  python IoT_Xep323ClientRead.py  -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --delay 30 --debug
+    #  Readout of  a specific node
+    #  python IoT_Xep323ClientRead.py  -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --nodeid Device01 --debug
+    #  Readout of a specific field 
+    #  python IoT_Xep323ClientRead.py  -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --field Humidity --debug
+    #  Readout of a specific node and field 
+    #  python IoT_Xep323ClientRead.py  -j "loginJID@yourdomain.com" -p "password" -g "clienttocallfordata@yourdomain.com" --nodeid Device01 --field Humidity --debug
 
 
     # Output verbosity options.
