@@ -17,17 +17,22 @@
 """
 
 max_lightlevel = 0
+max_distance = 0
 
 # global raspberry Io setting
 import RPi.GPIO as GPIO
 LED=16    # A led that follows the switch
 SWITCH=18 # An on off switch to control a lamp
 LIGHT=7   # A light level sensor to control the brightness
+GPIO_TRIGGER = 23 #the trigger for distans
+GPIO_ECHO = 24 # the echo signal
 
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(SWITCH,GPIO.IN)
 GPIO.setup(LED,GPIO.OUT)
 GPIO.setup(LIGHT,GPIO.IN)
+GPIO.setup(GPIO_TRIGGER,GPIO.OUT)  # Trigger                                                         
+GPIO.setup(GPIO_ECHO,GPIO.IN)      # Echo  
 
 import os
 import sys
@@ -40,6 +45,7 @@ import unittest
 import distutils.core
 import datetime
 from time import sleep
+from time import time
 from glob import glob
 from os.path import splitext, basename, join as pjoin
 from optparse import OptionParser
@@ -60,8 +66,36 @@ else:
 from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
 from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
 
+# Define function to measure distance
+def read_distance():
+    # Author : Matt Hawkins                                                       
+    # Date   : 09/01/2013
+    # Distribution : Raspbian
+    # Python : 2.7
+    # Set trigger to False (Low) and wait for it to settle            
+    GPIO.output(GPIO_TRIGGER, False)
+    sleep(0.5)
 
-# Define function to measure charge time
+    # Send 10us pulse to trigger                                                                   
+    GPIO.output(GPIO_TRIGGER, True)
+    sleep(0.00001)
+    GPIO.output(GPIO_TRIGGER, False)
+    start = time()
+    while GPIO.input(GPIO_ECHO)==0:
+        start = time()
+
+    while GPIO.input(GPIO_ECHO)==1:
+        stop = time()
+
+    # Calculate pulse length                                                                        
+    elapsed = stop-start
+    # Distance pulse travelled in that time is time                                                 
+    # multiplied by the speed of sound (cm/s) gives the result in cm                                
+    # That was the distance there and back so halve the value                                       
+    return (elapsed * 34000)/2
+
+
+# Define function to measure charge time on a capacitor 
 def RCtime (PiPin):
     # Reading an analogue sensor with
     # a single GPIO pin
@@ -89,7 +123,7 @@ def getserial():
     try:
         with open('/proc/cpuinfo', 'r') as content_file:
             line = content_file.readline()
-            whileline<>'':
+            while line<>'':
                 if line[0:6]=='Serial':
                     cpuserial = line[10:26]
                     return cpuserial
@@ -142,11 +176,23 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         global max_lightlevel
         max_lightlevel = max(lightlevel, max_lightlevel)
         control = int((lightlevel * 254) / max_lightlevel)
-        logging.debug('we are ready to control ' + str(control) + ' ' + str(lightlevel))
+        logging.info('LIGHT ctrl ' + str(control) + ' ' + str(lightlevel))
         logging.debug('Maximum is %d' % (max_lightlevel,))
         connections = self.client_roster.presence('john@ik.nu')
         for res, pres in connections.items():
             session = self['xep_0325'].set_request(self.boundjid.full, 'john@ik.nu'+"/"+res, self.controlcallback, [("bri", "long", str(control))])
+
+
+        # check distance
+        distance = read_distance()
+        global max_distance
+        max_distance = max(distance, max_distance)
+        control = int((distance * 65000) / max_distance)
+        logging.info('HUE ctrl ' + str(control) + ' ' + str(distance))
+        logging.debug('Maximum is %d' % (max_distance,))
+        connections = self.client_roster.presence('paul@ik.nu')
+        for res, pres in connections.items():
+            session = self['xep_0325'].set_request(self.boundjid.full, 'paul@ik.nu'+"/"+res, self.controlcallback, [("hue", "long", str(control))])
         
     def controlcallback(self,from_jid,result,error_msg,nodeIds=None,fields=None):
         """
