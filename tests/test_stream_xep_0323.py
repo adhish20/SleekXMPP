@@ -593,7 +593,7 @@ class TestStreamSensorData(SleekTest):
         <iq type='get'
                 from='master@clayster.com/amr'
                 to='tester@localhost'
-                id='disco1'>
+                id='1'>
             <query xmlns='http://jabber.org/protocol/disco#info'/>
         </iq>
         """)
@@ -601,7 +601,7 @@ class TestStreamSensorData(SleekTest):
         self.send("""
         <iq type='result'
             to='master@clayster.com/amr'
-            id='disco1'>
+            id='1'>
             <query xmlns='http://jabber.org/protocol/disco#info'>
                 <identity category='client' type='bot'/>
                 <feature var='urn:xmpp:iot:sensordata'/>
@@ -618,7 +618,7 @@ class TestStreamSensorData(SleekTest):
         <iq type='get'
                 from='master@clayster.com/amr'
                 to='tester@localhost'
-                id='disco1'>
+                id='1'>
             <query xmlns='http://jabber.org/protocol/disco#info'/>
         </iq>
         """)
@@ -627,7 +627,7 @@ class TestStreamSensorData(SleekTest):
         <iq type='result'
             from='tester@localhost'
             to='master@clayster.com/amr'
-            id='disco1'>
+            id='1'>
             <query xmlns='http://jabber.org/protocol/disco#info'>
                 <identity category='component' type='generic'/>
                 <feature var='urn:xmpp:iot:sensordata'/>

@@ -100,6 +100,8 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
             if not(opts.delayvalue):
                 # we should not do it again quit
                 self.disconnect(wait=False)  
+        else:
+            logging.warn("we got unknown from %s %s",from_jid,result)
 
     def session_start(self, event):
         self.send_presence()

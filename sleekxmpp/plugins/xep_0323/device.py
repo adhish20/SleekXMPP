@@ -251,7 +251,7 @@ class Device(object):
 		    return False;
 
 		if flags is None:
-		    flags = {};
+		    flags = self.momentary_data[name]['flags'];
 		
 		flags["momentary"] = "true"
 		self.momentary_data[name] = {"value": str(value), "flags": flags}

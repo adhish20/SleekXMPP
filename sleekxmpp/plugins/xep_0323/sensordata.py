@@ -409,6 +409,7 @@ class XEP_0323(BasePlugin):
         Arguments:
             session         -- The request session id
         """
+        logging.debug("IoT RECEIVED"+ str(session))
         for n in self.sessions[session]["nodeDone"]:
             if not self.sessions[session]["nodeDone"][n]:
                 return False;
@@ -449,6 +450,8 @@ class XEP_0323(BasePlugin):
         """
         if not session in self.sessions:
             # This can happend if a session was deleted, like in a cancellation. Just drop the data.
+            logging.warn("Failed recieving the session")
+            logging.warn(str(session))
             return
 
         if result == "error":
@@ -499,7 +502,7 @@ class XEP_0323(BasePlugin):
             else:
                 # Restart comm timer
                 self.sessions[session]["commTimers"][nodeId].reset();
-
+            logging.debug("message ready "+str(msg))
             msg.send();
 
     def _handle_event_cancel(self, iq):
@@ -610,7 +613,7 @@ class XEP_0323(BasePlugin):
         iq['req']._set_flags(flags);
 
         self.sessions[seqnr] = {"from": iq['from'], "to": iq['to'], "seqnr": seqnr, "callback": callback};
-        logging.info('IoT SEND '+str(iq))
+        logging.info('IoT SEND 42 '+str(iq))
         iq.send(block=False); 
 
         return seqnr;

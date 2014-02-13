@@ -11,6 +11,7 @@
 from sleekxmpp import Iq, Message
 from sleekxmpp.xmlstream import register_stanza_plugin, ElementBase, ET, JID
 from re import match
+import logging
 
 class Sensordata(ElementBase):
     """ Placeholder for the namespace, not used as a stanza """
@@ -58,6 +59,7 @@ class Request(ElementBase):
         Arguments:
             xml -- Use an existing XML object for the stanza's values.
         """
+        logging.info("SENSORDATA "+ str(xml))
         ElementBase.setup(self, xml)
         self._nodes = set([node['nodeId'] for node in self['nodes']])
         self._fields = set([field['name'] for field in self['fields']])
@@ -772,7 +774,7 @@ register_stanza_plugin(Request, RequestField, iterable=True)
 register_stanza_plugin(Iq, Accepted)
 register_stanza_plugin(Message, Failure)
 register_stanza_plugin(Failure, Error)
-
+register_stanza_plugin(Message, Done)
 register_stanza_plugin(Iq, Rejected)
 
 register_stanza_plugin(Message, Fields)

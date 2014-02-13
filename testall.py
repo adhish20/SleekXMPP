@@ -49,9 +49,9 @@ def run_tests(exlude=[], include=[]):
     runner = unittest.TextTestRunner(verbosity=2)
 
     # Disable logging output
-    logging.basicConfig(level=100)
-    logging.disable(100)
-    #logging.basicConfig(level=1)
+    #logging.basicConfig(level=100)
+    #logging.disable(100)
+    logging.basicConfig(level=1)
     #logging.disable(100)
 
     result = runner.run(tests)

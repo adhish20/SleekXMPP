@@ -369,7 +369,7 @@ if __name__ == '__main__':
         myDevice._add_field(name="Counter", typename="numeric", unit="Count");
         myDevice._set_momentary_timestamp(myDevice._get_timestamp())
         myDevice._add_field_momentary_data("Counter", "0", flags={"automaticReadout": "true","momentary":"true"});
-        myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true"});
+        myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true" , "writeable":"true"});
         
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);

@@ -197,10 +197,10 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 msg.reply(str(self.device.momentary_data)).send()
             elif msg['body'].startswith('T'):
                 logging.debug('got a toggle ' + str(msg))
-                if self.device.getrelay():
-                    self.device.setrelay(False)
+                if self.device.relay:
+                    self.device.relay=False
                 else:
-                    self.device.setrelay(True)
+                    self.device.srelay=True
             elif msg['body'].find('=')>0:
                 logging.debug('got a control' + str(msg))
                 (variable,value)=msg['body'].split('=')
@@ -272,14 +272,15 @@ class TheDevice(SensorDevice,ControlDevice):
         self._add_field_momentary_data("Counter", self.counter)
         self._add_field_momentary_data("Relay", self.relay)
 
+    
     def _set_field_value(self, name,value):
         """ overrides the set field value from device to act on my local values                                            
         """
         if name=="Toggle":
-            if self.device.getrelay():
-                self.device.setrelay(False)
+            if self.relay:
+                self.relay=False
             else:
-                self.device.setrelay(True)
+                self.relay=True
                 self._set_momentary_timestamp(self._get_timestamp())
             self._add_field_momentary_data("Relay", self.relay)
         elif name=="Relay":
@@ -381,8 +382,9 @@ if __name__ == '__main__':
         myDevice._add_field(name="Counter", typename="numeric", unit="Count");
         myDevice._set_momentary_timestamp(myDevice._get_timestamp())
         myDevice._add_field_momentary_data("Counter", "0", flags={"automaticReadout": "true","momentary":"true"});
-        myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true"});
-        
+        myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        xmpp.device=myDevice
+
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp.beClientOrServer(server=True)
