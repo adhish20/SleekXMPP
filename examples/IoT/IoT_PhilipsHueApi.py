@@ -13,12 +13,43 @@
 import os
 import sys
 import socket
+import json
+from urllib import urlopen
 
 # This can be used when you are in a test environment and need to make paths right
 sys.path=[os.path.join(os.path.dirname(__file__), '../..'),os.path.join(os.path.dirname(__file__), '../../../phue')]+sys.path
 
+
+bridge=None
+
+import logging
+import unittest
+import distutils.core
+import datetime
+
+from glob import glob
+from os.path import splitext, basename, join as pjoin
+from optparse import OptionParser
+from urllib import urlopen
+
+import sleekxmpp
+# Python versions before 3.0 do not use UTF-8 encoding
+# by default. To ensure that Unicode is handled properly
+# throughout SleekXMPP, we will set the default encoding
+# ourselves to UTF-8.
+if sys.version_info < (3, 0):
+    from sleekxmpp.util.misc_ops import setdefaultencoding
+    setdefaultencoding('utf8')
+else:
+    raw_input = input
+    
+from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
+from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
+
 from phue import Bridge
 class DummyBridge():
+    def __init_(self):
+        logging.warning("You are know using a dummy bridge")
     def set_light(self,dummy1,dummy2):
         logging.debug('dummybridge')
     def set_group(self,dummy1,dummy2):
@@ -34,20 +65,27 @@ class DummyBridge():
                       
 class BridgeContainer():
     
-    def __init__(self,transitiontime=50,individual=None,ip='192.168.2.38'):
+    def __init__(self,transitiontime=50,individual=None,ip=None):
         try:
+            if not ip:
+                # try to find a bridge with meethue api
+                logging.debug("will try finding the hue bridge")
+                localbridge=json.loads(urlopen('http://www.meethue.com/api/nupnp').read())
+                ip=localbridge[0]["internalipaddress"]
+                logging.info('connecting to localbridge at '+str(ip))
             self.mybridge=None    
             self.mybridge=Bridge(ip)
             self.mybridge.connect()
             self.mybridge.get_api()
         except Exception as e:
-            logging.warn('failed to connect to HUE server')
-            self.mybridge=DummyBridge()          
+            logging.warn('failed to connect to HUE server did you push the button?')
+            self.mybridge=DummyBridge()  
+                
         self.transitiontime = transitiontime
         self.individual = None
         if individual:
             self.individual=int(individual)
-        self.toggle()
+        self.alert()
         
     def setTransitionTime(self,value):
         # this should be the transistion time in seconds
@@ -97,32 +135,6 @@ class BridgeContainer():
         else:
             self.mybridge.set_group(0, {'alert':'select'})    
 
-bridge=None
-
-
-import logging
-import unittest
-import distutils.core
-import datetime
-
-from glob import glob
-from os.path import splitext, basename, join as pjoin
-from optparse import OptionParser
-from urllib import urlopen
-
-import sleekxmpp
-# Python versions before 3.0 do not use UTF-8 encoding
-# by default. To ensure that Unicode is handled properly
-# throughout SleekXMPP, we will set the default encoding
-# ourselves to UTF-8.
-if sys.version_info < (3, 0):
-    from sleekxmpp.util.misc_ops import setdefaultencoding
-    setdefaultencoding('utf8')
-else:
-    raw_input = input
-    
-from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
-from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
 
 #from sleekxmpp.exceptions import IqError, IqTimeout
 
@@ -148,14 +160,12 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
         #Some local status variables to use
         self.device=None
-        self.releaseMe=False
         self.beServer=True
         self.clientJID=None
         self.controlJID=None
         self.received=set()
         self.controlField=None
         self.controlValue=None
-        self.delayValue=None
         self.toggle=0
 
     def datacallback(self,from_jid,result,nodeId=None,timestamp=None,fields=None,error_msg=None):
@@ -196,23 +206,6 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         """
         logging.debug("IoT got a form "+str(result))
         
-    def beClientOrServer(self,server=True,clientJID=None,controlJID=None,controlField=None,controlValue=None ):
-        if server:
-            self.beServer=True
-            self.clientJID=None
-        elif clientJID:
-            self.beServer=False
-            self.clientJID=clientJID            
-        else:
-            self.beServer=False
-            self.controlJID=controlJID
-            self.controlField=controlField
-            self.controlValue=controlValue
-
-    def testForRelease(self):
-        # todo thread safe
-        return self.releaseMe
-
     def doReleaseMe(self):
         # todo thread safe
         self.releaseMe=True
@@ -252,14 +245,6 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.get_roster()
         # tell your preffered friend that you are alive 
         # self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
-
-        if not(self.beServer):
-            if self.clientJID:
-                logging.info('We are a client start asking %s for values' % self.clientJID)
-                self.schedule('end', self.delayValue, self.askClientForValue, repeat=True, kwargs={})
-            elif self.controlJID:
-                logging.info('We are a control client set field %s to value %s on %s every %s',self.controlField,self.controlValue, self.controlJID, self.delayValue)
-                self.schedule('end', self.delayValue, self.sendControlMessage, repeat=True, kwargs={})
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):
@@ -303,41 +288,6 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         else:
             logging.debug("got unknown message type %s", str(msg['type']))
 
-    def askClientForValue(self):
-        #need to find the full jid to call for data
-        connections=self.client_roster.presence(self.clientJID)
-        logging.debug('IoT will call for data to '+ str(connections))
-        for res, pres in connections.items():
-            # ask every session on the jid for data
-            if self.controlField:
-                session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, fields=[self.controlField],flags={"momentary":"true"})
-            else:
-                session=self['xep_0323'].request_data(self.boundjid.full,self.clientJID+"/"+res,self.datacallback, flags={"momentary":"true"})
-
-    def sendControlMessage(self):
-        #need to find the full jid to call for data
-        connections=self.client_roster.presence(self.controlJID)
-        for res, pres in connections.items():
-            # ask every session on the jid for data
-            # session=self['xep_0325'].get_form(self.boundjid.full,self.controlJID+"/"+res,self.getformcallback)
-
-            if not self.controlField:
-                #no fields provided default to toggle a relay:
-                if self.toggle:
-                    self.toggle=0
-                    logging.info('IoT will send relay true to '+ str(connections))
-                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","1")])
-                    session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","true")])
-                    #session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","true")])
-                else:
-                    self.toggle=1
-                    logging.info('IoT will send relay false to '+ str(connections))
-                    #session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","0")])
-                    session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[("relay","boolean","false")])
-                    #session=self['xep_0325'].set_command(self.boundjid.full,self.controlJID+"/"+res,[("relay","boolean","false")])
-            else:
-                logging.info('IoT will set %s to %s on to %s'%(self.controlField,self.controlValue,str(connections)))
-                session=self['xep_0325'].set_request(self.boundjid.full,self.controlJID+"/"+res,self.controlcallback,[(self.controlField,"boolean",self.controlValue)])
             
 class TheDevice(SensorDevice,ControlDevice):
     """
@@ -360,16 +310,20 @@ class TheDevice(SensorDevice,ControlDevice):
         the implementation of the refresh method
         """
         self._set_momentary_timestamp(self._get_timestamp())
-        self.counter=self.counter+1
-        self._add_field_momentary_data("Counter", self.counter)
-        self._add_field_momentary_data("Relay", self.relay)
-
+        myDevice._add_field_momentary_data("transitiontime", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("hue", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("on", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("toggle", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("bri", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        myDevice._add_field_momentary_data("sat", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        
     def _set_field_value(self, name,value):
         """ overrides the set field value from device to act on my local values                                            
         """
-        
         if name=="hue":
             bridge.setHue(int(value))
+        elif name=="transitiontime":
+            bridge.setTransitionTime(float(value))
         elif name=="bri":
             bridge.setBri(int(value))
         elif name=="sat":
@@ -378,8 +332,9 @@ class TheDevice(SensorDevice,ControlDevice):
             bridge.toggle()
         elif name=="on":
             bridge.setOn(int(value))
-
-        
+        elif name=="alert":
+            bridge.alert()
+            
 if __name__ == '__main__':
 
     # Setup the command line arguments.
@@ -387,12 +342,13 @@ if __name__ == '__main__':
     # This script is an evolution from the IoT_TestDevice to integrate the web API from Philips HUE
     # Start this script in several instanses to control different lamps or the whole group
     # 
-    #   Start with control of lamp 2
+    #   Start with control of lamp individual 2
     #   python IoT_PhilipsHueApi.py -j "onelampJID@yourdomain.com" -p "password" -n "Lamp1" --individual 2 --bridgeip "192.168.2.22" --debug
     #
     #   starting without individual creates control of group 0
     #   python IoT_PhilipsHueApi.py -j "alllampsJID@yourdomain.com" -p "password" -n "LampGroup0" --bridgeip "192.168.2.22" --debug
     #
+    #   If no bridgeip is provided 
     #   TODO: clean up inheritage from IoT_TestDevice
     
     optp = OptionParser()
@@ -420,20 +376,10 @@ if __name__ == '__main__':
     # IoT test
     optp.add_option("-n", "--nodeid", dest="nodeid",
                     help="Server (Provider) I am a device that can be called for data or send control to", default=None)
-    optp.add_option("-g", "--getsensorjid", dest="getsensorjid",
-                    help="Device to call for data on", default=None)
-    optp.add_option("-c", "--controljid", dest="controljid",
-                    help="Device to call for data on", default=None)
-    optp.add_option("--field", dest="controlfield",
-                    help="Field to act upon", default=None)
-    optp.add_option("--value", dest="controlvalue",
-                    help="control value", default=None)
-    optp.add_option("--delay", dest="delayvalue",
-                    help="secondsdelay between reads or controls", default=30)
     optp.add_option("--individual", dest="individual",
                     help="setting the control to an individual", default=None)
     optp.add_option("--bridgeip", dest="bridgeip",
-                    help="This is where the bridge is", default='192.168.1.42')
+                    help="This is where the bridge is", default=None)
     
     opts, args = optp.parse_args()
 
@@ -446,53 +392,42 @@ if __name__ == '__main__':
     if opts.password is None:
         opts.password = getpass.getpass("Password: ")
 
-    logging.debug("setting an individual " + str(opts.individual))
+    logging.debug("setting an individual to" + str(opts.individual))
+
+    #connect to a bridge
     bridge=BridgeContainer(individual=opts.individual,ip=opts.bridgeip)
-        
+
+    #start up the XMPP client
     xmpp = IoT_TestDevice(opts.jid,opts.password)
-    xmpp.delayValue=int(opts.delayvalue)
-    logging.debug("DELAY " + str(int(opts.delayvalue)) + "  " + str(xmpp.delayValue))
     
-    if opts.nodeid:
-        # prepare the IoT_TestDevice to be a provider of data and be able to recieve control commands
-        # xmpp['xep_0030'].add_feature(feature='urn:xmpp:sn',
-        # node=opts.nodeid,
-        # jid=xmpp.boundjid.full)
-        
-        # Instansiate the device object
-        myDevice = TheDevice(opts.nodeid);
-        myDevice._add_field(name="Relay", typename="numeric", unit="Bool");
-        myDevice._add_control_field(name="transitiontime", typename="long", value=50);
-        myDevice._add_control_field(name="hue", typename="long", value=1);
-        myDevice._add_control_field(name="on", typename="boolean", value=1);
-        myDevice._add_control_field(name="toggle", typename="boolean", value=1);
-        myDevice._add_control_field(name="bri", typename="long", value=1);
-        myDevice._add_control_field(name="sat", typename="long", value=1);
-        myDevice._add_field(name="Counter", typename="long", unit="Count");
-        myDevice._set_momentary_timestamp(myDevice._get_timestamp())
-        myDevice._add_field_momentary_data("hue", "0", flags={"automaticReadout": "true","momentary":"true"});
-        myDevice._add_field_momentary_data("on", "0", flags={"automaticReadout": "true","momentary":"true"});
-        
-        xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
-        xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
-
-        xmpp.beClientOrServer(server=True)
-        xmpp.connect()
-        xmpp.process(block=True)    
-        logging.debug("lost connection")
+    # Instansiate the device object
+    myDevice = TheDevice(opts.nodeid);
+    myDevice._add_control_field(name="transitiontime", typename="long", value=50);
+    myDevice._add_control_field(name="hue", typename="long", value=1);
+    myDevice._add_control_field(name="on", typename="boolean", value=1);
+    myDevice._add_control_field(name="toggle", typename="boolean", value=1);
+    myDevice._add_control_field(name="bri", typename="long", value=1);
+    myDevice._add_control_field(name="sat", typename="long", value=1);
+    
+    myDevice._add_field(name="transitiontime", typename="numeric", unit="ms")
+    myDevice._add_field(name="hue", typename="numeric", unit="Count")
+    myDevice._add_field(name="on", typename="boolean", unit="Count")
+    myDevice._add_field(name="toggle", typename="boolean", unit="Count")
+    myDevice._add_field(name="bri", typename="numeric", unit="Count")
+    myDevice._add_field(name="sat", typename="numeric", unit="Count")
+    
+    myDevice._set_momentary_timestamp(myDevice._get_timestamp())
+    myDevice._add_field_momentary_data("transitiontime", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+    myDevice._add_field_momentary_data("hue", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+    myDevice._add_field_momentary_data("on", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+    myDevice._add_field_momentary_data("toggle", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+    myDevice._add_field_momentary_data("bri", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+    myDevice._add_field_momentary_data("sat", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+    
+    xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
+    xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
+    
+    xmpp.connect()
+    xmpp.process(block=True)    
+    logging.debug("lost connection")
             
-    elif opts.getsensorjid:
-        logging.debug("will try to call another device for data")
-        xmpp.beClientOrServer(server=False,clientJID=opts.getsensorjid)
-        xmpp.connect()
-        xmpp.process(block=True)
-        logging.debug("ready ending")
-
-    elif opts.controljid:
-        logging.debug("will try to send control message to another device")
-        xmpp.beClientOrServer(server=False,controlJID=opts.controljid,controlField=opts.controlfield,controlValue=opts.controlvalue)
-        xmpp.connect()
-        xmpp.process(block=True)
-        logging.debug("ready ending")
-    else:
-       print "noopp didn't happen"
