@@ -25,14 +25,14 @@ class FieldTypes():
     All field types are optional booleans that default to False
     """
     field_types = set([ 'momentary','peak','status','computed','identity','historicalSecond','historicalMinute','historicalHour', \
-                        'historicalDay','historicalWeek','historicalMonth','historicalQuarter','historicalYear','historicalOther'])
+                        'historicalDay','historicalWeek','historicalMonth','historicalQuarter','historicalYear','historicalOther','writable'])
 
 class FieldStatus():
     """ 
     All field statuses are optional booleans that default to False
     """
     field_status = set([ 'missing','automaticEstimate','manualEstimate','manualReadout','automaticReadout','timeOffset','warning','error', \
-                         'signed','invoiced','endOfSeries','powerFailure','invoiceConfirmed'])
+                         'signed','invoiced','endOfSeries','powerFailure','invoiceConfirmed','writable'])
 
 class Request(ElementBase):
     namespace = 'urn:xmpp:iot:sensordata'
