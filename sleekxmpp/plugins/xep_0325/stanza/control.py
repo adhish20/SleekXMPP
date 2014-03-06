@@ -140,6 +140,8 @@ class ControlSet(ElementBase):
                 dataObj = DateTimeParameter(parent=self);
             elif typename == "double":
                 dataObj = DoubleParameter(parent=self);
+            elif typename == "numeric":
+                dataObj = NumericParameter(parent=self);
             elif typename == "duration":
                 dataObj = DurationParameter(parent=self);
             elif typename == "int":
@@ -474,6 +476,14 @@ class DoubleParameter(BaseParameter):
     name = 'double'
     plugin_attrib = name
 
+class NumericParameter(BaseParameter):
+    """ 
+    Field data of type numeric. 
+    Note that the value is expressed as a string. 
+    """
+    name = 'numeric'
+    plugin_attrib = name
+
 class DurationParameter(BaseParameter):
     """ 
     Field data of type duration. 
@@ -517,6 +527,7 @@ register_stanza_plugin(ControlSet, StringParameter, iterable=True)
 register_stanza_plugin(ControlSet, DateParameter, iterable=True)
 register_stanza_plugin(ControlSet, DateTimeParameter, iterable=True)
 register_stanza_plugin(ControlSet, DoubleParameter, iterable=True)
+register_stanza_plugin(ControlSet, NumericParameter, iterable=True)
 register_stanza_plugin(ControlSet, DurationParameter, iterable=True)
 register_stanza_plugin(ControlSet, IntParameter, iterable=True)
 register_stanza_plugin(ControlSet, LongParameter, iterable=True)
