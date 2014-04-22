@@ -116,9 +116,10 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         else:
             logging.debug("got unknown message type %s", str(msg['type']))
 
-RELAY=24
-PIR=23
-            
+RELAY=18
+PIR=16
+
+        
 class TheDevice(SensorDevice,ControlDevice):
     """
     This is the actual device object that you will use to get information from your real hardware
@@ -129,7 +130,7 @@ class TheDevice(SensorDevice,ControlDevice):
         SensorDevice.__init__(self,nodeId)
         ControlDevice.__init__(self,nodeId)
 
-        GPIO.setmode(GPIO.BCM)
+        GPIO.setmode(GPIO.BOARD)
         GPIO.setup(PIR,GPIO.IN)
         GPIO.setup(RELAY,GPIO.OUT)
 
