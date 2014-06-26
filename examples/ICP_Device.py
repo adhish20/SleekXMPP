@@ -10,7 +10,7 @@
     See the file LICENSE for copying permission.
 
     This eables The GPIO on a raspberry to be used as XMPP sensors
-    the example is done with http://wiki.sweetpeas.se/index.php?title=Rpi_labbkitt 
+    the example is done with http://wiki.sweetpeas.se/index.php?title=Rpi_labbkitt
 
     Must be run with root privileges to be able access GPIO
 
@@ -20,6 +20,8 @@ import os
 import sys
 
 # This can be used when you are in a test environment and need to make paths right
+from icp import icp
+
 sys.path=[os.path.join(os.path.dirname(__file__), '..')]+sys.path
 
 import logging
@@ -42,7 +44,7 @@ if sys.version_info < (3, 0):
     setdefaultencoding('utf8')
 else:
     raw_input = input
-    
+
 
 from sleekxmpp.plugins.xep_0323.device import Device as SensorDevice
 from sleekxmpp.plugins.xep_0325.device import Device as ControlDevice
@@ -62,6 +64,7 @@ def getserial():
         cpuserial = "ERROR000000000"
     return cpuserial
 
+## Just here for the main(). device class further down
 class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
     """
@@ -81,11 +84,11 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
     def addDevice(self, device):
         self.device=device
-        
+
     def session_start(self, event):
         self.send_presence()
         self.get_roster()
-        # tell your preffered friend that you are alive 
+        # tell your preffered friend that you are alive
         self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
 
     def message(self, msg):
@@ -100,77 +103,47 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 self.device.refresh([])
                 logging.debug('momentary values' + str(self.device.momentary_data))
                 msg.reply(str(self.device.momentary_data)).send()
-            elif msg['body'].startswith('T'):
-                logging.debug('got a toggle ' + str(msg))
-                if self.device.getrelay():
-                    self.device.setrelay(False)
-                else:
-                    self.device.setrelay(True)
             elif msg['body'].find('=')>0:
                 logging.debug('got a control' + str(msg))
                 (variable,value)=msg['body'].split('=')
                 logging.debug('setting %s to %s' % (variable,value))
-                
+
             else:
                 pass
         else:
             logging.debug("got unknown message type %s", str(msg['type']))
 
-RELAY=18
-PIR=16
+RELAY=24
+PIR=23
 
-        
-class TheDevice(SensorDevice,ControlDevice):
+class ICPDevice(SensorDevice,ControlDevice):
     """
     This is the actual device object that you will use to get information from your real hardware
     You will be called in the refresh method when someone is requesting information from you
     """
 
-    def __init__(self,nodeId):
+    def __init__(self,nodeId, serialport, temperature_address):
         SensorDevice.__init__(self,nodeId)
         ControlDevice.__init__(self,nodeId)
 
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(PIR,GPIO.IN)
-        GPIO.setup(RELAY,GPIO.OUT)
+        self.icp= icp(serialport, temperature_address, 9600)
 
-    def getrelay(self):
-        return GPIO.input (RELAY)
-    def setrelay(self,state):
-        return GPIO.output (RELAY,state)
+    def gettemperature(self):
 
-    def getpir(self):
-        return GPIO.input (PIR)
+        v0 = self.icp.read_single_analog(0)
+        v1 = self.icp.read_single_analog(1)
+        result=(v1+v0)/2.0
+        logging.debug("Read temperature: {0}".format(result))
+        return result
 
     def refresh(self,fields):
         """
         the implementation of the refresh method
         """
         self._set_momentary_timestamp(self._get_timestamp())
-        if self.getpir():
-            self._add_field_momentary_data("pir", 'true')
-        else:
-            self._add_field_momentary_data("pir", 'false')
 
-        if self.getrelay():
-            self._add_field_momentary_data("relay", 'true')
-        else:
-            self._add_field_momentary_data("relay", 'false')
+        self._add_field_momentary_data("temperature", str(self.gettemperature()))
 
-    def _set_field_value(self, name,value):
-        """ overrides the set field value from device to act on my local values
-        """
-        if name=="relay":
-            if value=='true':
-                self.setrelay(True)
-            else:
-                self.setrelay(False)
-        elif name=="toggle":
-            if self.getrelay():
-                self.setrelay(False)
-            else:
-                self.setrelay(True)
-        
 if __name__ == '__main__':
 
     # Setup the command line arguments.
@@ -178,7 +151,7 @@ if __name__ == '__main__':
     #
     #   python IoT_GPIODevice.py -j "serverjid@yourdomain.com" -p "password" -n "TestIoT" --debug
     #
-    
+
     optp = OptionParser()
 
     # Output verbosity options.
@@ -206,7 +179,13 @@ if __name__ == '__main__':
                     help="Another device to call for data on", default=None)
     optp.add_option("-n", "--nodeid", dest="nodeid",
                     help="I am a device get ready to be called", default=None)
-    
+
+
+    optp.add_option("-s", "--serialport", dest="serialport",
+                    help="serial port to use for temperature readings", default="/dev/ttyUSB0")
+    optp.add_option("-a", "--address", dest="temperature_address",
+                    help="address of the temperature reading device on the bus", default=3)
+
     opts, args = optp.parse_args()
 
      # Setup logging.
@@ -217,29 +196,25 @@ if __name__ == '__main__':
         opts.jid = raw_input("Username: ")
     if opts.password is None:
         opts.password = getpass.getpass("Password: ")
-        
+
 
     xmpp = IoT_TestDevice(opts.jid,opts.password)
     xmpp.register_plugin('xep_0030')
     xmpp.register_plugin('xep_0323')
     xmpp.register_plugin('xep_0325')
 
-    myDevice = TheDevice(opts.nodeid);
+    myDevice = ICPDevice(opts.nodeid, opts.serialport, opts.temperature_address);
 
     xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10)
     xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10)
 
-    myDevice._add_field(name="relay", typename="boolean", unit="Bool")
-    myDevice._add_control_field(name="relay", typename="boolean",value="false");
-    myDevice._add_control_field(name="toggle", typename="boolean",value="false");
-    myDevice._add_field(name="pir", typename="boolean", unit="Bool");
+    myDevice._add_field(name="temperature", typename="numeric", unit="Degree Celsius");
     myDevice._set_momentary_timestamp("2013-03-07T16:24:30")
-    myDevice._add_field_momentary_data("relay", "false", flags={"automaticReadout": "true"})
-    myDevice._add_field_momentary_data("pir", "false", flags={"automaticReadout": "true"})
+    myDevice._add_field_momentary_data("temperature", str(myDevice.gettemperature()), flags={"automaticReadout": "true"})
     xmpp.addDevice(myDevice)
 
     xmpp.connect()
-    xmpp.process(block=True)    
+    xmpp.process(block=True)
     logging.debug("lost connection")
 
 
