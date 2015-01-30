@@ -10,15 +10,21 @@
     See the file LICENSE for copying permission.
 """
 
+
+
 import os
 import sys
 import socket
 import json
 from urllib import urlopen
+from time import sleep
+
+# This is based on the phue python hue bridge software
+# clone the git clone https://github.com/studioimaginaire/phue.git at parallel directory to SleekXMPP
+# or install in python 
 
 # This can be used when you are in a test environment and need to make paths right
 sys.path=[os.path.join(os.path.dirname(__file__), '../..'),os.path.join(os.path.dirname(__file__), '../../../phue')]+sys.path
-
 
 bridge=None
 
@@ -66,21 +72,24 @@ class DummyBridge():
 class BridgeContainer():
     
     def __init__(self,transitiontime=50,individual=None,ip=None):
-        try:
-            if not ip:
-                # try to find a bridge with meethue api
-                logging.debug("will try finding the hue bridge")
-                localbridge=json.loads(urlopen('http://www.meethue.com/api/nupnp').read())
-                ip=localbridge[0]["internalipaddress"]
-                logging.info('connecting to localbridge at '+str(ip))
-            self.mybridge=None    
-            self.mybridge=Bridge(ip)
-            self.mybridge.connect()
-            self.mybridge.get_api()
-        except Exception as e:
-            logging.warn('failed to connect to HUE server did you push the button?')
-            self.mybridge=DummyBridge()  
-                
+        self.mybridge=None    
+        while not self.mybridge:
+            try:
+                if not ip:
+                    # try to find a bridge with meethue api
+                    logging.debug("will try finding the hue bridge")
+                    localbridge=json.loads(urlopen('http://www.meethue.com/api/nupnp').read())
+                    ip=localbridge[0]["internalipaddress"]
+                    logging.info('connecting to localbridge at '+str(ip))
+                self.mybridge=Bridge(ip)
+                self.mybridge.connect()
+                self.mybridge.get_api()
+            except Exception as e:
+                logging.warn('failed to connect to HUE server did you push the button?')
+                self.mybridge=None    
+                #self.mybridge=DummyBridge()  
+            sleep(10)
+
         self.transitiontime = transitiontime
         self.individual = None
         if individual:
@@ -104,6 +113,12 @@ class BridgeContainer():
             self.mybridge.set_light(self.individual, options)
         else:
                 self.mybridge.set_group(0, options)
+
+    def getAll(self):
+        # returns dictionary with all values
+        # {"state": {"on":true,"bri":254,"hue":45000,"sat":253,"xy":[0.1914,0.0879],"ct":500,"alert":"select","effect":"none","colormode":"hs","reachable":true},
+        # "type": "Extended color light", "name": "Hue Lamp", "modelid": "LCT001", "swversion": "66009663", "pointsymbol": { "1":"none", "2":"none", "3":"none", "4":"none", "5":"none", "6":"none", "7":"none", "8":"none" }}
+        return self.mybridge.get_light(self.individual)['state']
 
     def setEffect(self, value):
         self.sendAll(effect=effect)
@@ -133,6 +148,12 @@ class BridgeContainer():
                 self.mybridge.set_group(0, {'on': False})
             else:
                 self.mybridge.set_group(0, {'on': True})
+    def setOn(self,value):
+        if self.individual:
+            if value:
+                self.mybridge.set_light(self.individual, {'on': True})
+            else:
+                self.mybridge.set_light(self.individual, {'on': False})
 
     def alert(self):
         if self.individual:
@@ -319,17 +340,21 @@ class TheDevice(SensorDevice,ControlDevice):
         status=bridge.get_state()
 
         self._set_momentary_timestamp(self._get_timestamp())
+        # getvalues from lamps
+        state=bridge.getAll()
+
         myDevice._add_field_momentary_data("transitiontime", str(bridge.transitiontime), flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("hue", str(status['hue']), flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("on", str(status['on']), flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("toggle", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("bri", str(status['bri']), flags={"automaticReadout": "true","momentary":"true","writable":"true"});
-        myDevice._add_field_momentary_data("sat", str(status['sat']), flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        myDevice._add_field_momentary_data("hue", state['hue'], flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("on", state['on'], flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("toggle", False, flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("bri", state['bri'], flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        myDevice._add_field_momentary_data("sat", state['sat'], flags={"automaticReadout": "true","momentary":"true","writable":"true"});
         
 
     def _set_field_value(self, name,value):
         """ overrides the set field value from device to act on my local values                                            
         """
+        logging.debug(" setting fields " + name + " to: " + str(value) )
         if name=="hue":
             bridge.setHue(int(value))
         elif name=="transitiontime":
@@ -412,12 +437,12 @@ if __name__ == '__main__':
     
     # Instansiate the device object
     myDevice = TheDevice(opts.nodeid);
-    myDevice._add_control_field(name="transitiontime", typename="long", value=50);
-    myDevice._add_control_field(name="hue", typename="long", value=1);
+    myDevice._add_control_field(name="transitiontime", typename="numeric", value=50);
+    myDevice._add_control_field(name="hue", typename="numeric", value=1);
     myDevice._add_control_field(name="on", typename="boolean", value=1);
     myDevice._add_control_field(name="toggle", typename="boolean", value=1);
-    myDevice._add_control_field(name="bri", typename="long", value=1);
-    myDevice._add_control_field(name="sat", typename="long", value=1);
+    myDevice._add_control_field(name="bri", typename="numeric", value=1);
+    myDevice._add_control_field(name="sat", typename="numeric", value=1);
     
     myDevice._add_field(name="transitiontime", typename="numeric", unit="ms")
     myDevice._add_field(name="hue", typename="numeric", unit="Count")
