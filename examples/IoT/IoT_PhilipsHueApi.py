@@ -117,6 +117,11 @@ class BridgeContainer():
     def setSat(self, value):
         self.sendAll(sat=value)
 
+    def get_state(self):
+        if self.individual:
+            logging.debug(str(self.mybridge.get_light(self.individual)))
+            return self.mybridge.get_light(self.individual)['state']
+
     def toggle(self):
         if self.individual:
             if self.mybridge.get_light(self.individual)['state']['on']:
@@ -257,9 +262,11 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                 bridge.alert()
             elif msg['body'].startswith('?'):
                 logging.debug('got a question ' + str(msg))
-                self.device.refresh([])
-                logging.debug('momentary values' + str(self.device.momentary_data))
-                msg.reply(str(self.device.momentary_data)).send()
+                status=bridge.get_state()
+                msg.reply("mystatus is\n on=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s"%(str(status['on']),str(status['bri']),str(status['hue']),str(status['sat']),str(status['ct']))).send()
+#self.device.refresh([])
+                #logging.debug('momentary values' + str(self.device.momentary_data))
+                #msg.reply(str(self.device.momentary_data)).send()
             elif msg['body'].startswith('T'):
                 logging.debug('got a toggle ' + str(msg))
                 bridge.toggle()
@@ -309,14 +316,17 @@ class TheDevice(SensorDevice,ControlDevice):
         """
         the implementation of the refresh method
         """
+        status=bridge.get_state()
+
         self._set_momentary_timestamp(self._get_timestamp())
-        myDevice._add_field_momentary_data("transitiontime", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("hue", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("on", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("transitiontime", str(bridge.transitiontime), flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("hue", str(status['hue']), flags={"automaticReadout": "true","momentary":"true","writable":"true"})
+        myDevice._add_field_momentary_data("on", str(status['on']), flags={"automaticReadout": "true","momentary":"true","writable":"true"})
         myDevice._add_field_momentary_data("toggle", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"})
-        myDevice._add_field_momentary_data("bri", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
-        myDevice._add_field_momentary_data("sat", "0", flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        myDevice._add_field_momentary_data("bri", str(status['bri']), flags={"automaticReadout": "true","momentary":"true","writable":"true"});
+        myDevice._add_field_momentary_data("sat", str(status['sat']), flags={"automaticReadout": "true","momentary":"true","writable":"true"});
         
+
     def _set_field_value(self, name,value):
         """ overrides the set field value from device to act on my local values                                            
         """
