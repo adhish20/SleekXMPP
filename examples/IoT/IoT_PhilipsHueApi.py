@@ -100,19 +100,17 @@ class BridgeContainer():
         # this should be the transistion time in seconds
         self.transitiontime = int(10 * float(value))
 
-    def sendAll(self, hue=None, bri=None, sat=None, effect=None):
+    def sendAll(self, **options):
         lamp = self.individual or 0
-        options = { }
-        if hue is not None: options['hue'] = hue
-        if bri is not None: options['bri'] = bri
-        if sat is not None: options['sat'] = sat
-        if effect is not None: options['effect'] = effect
+        for k,v in options.iteritems():
+            if v is None:
+                del(options[k])
         if self.transitiontime >= 0:
             options['transitiontime'] = self.transitiontime
         if self.individual:
             self.mybridge.set_light(self.individual, options)
         else:
-                self.mybridge.set_group(0, options)
+            self.mybridge.set_group(0, options)
 
     def getAll(self):
         # returns dictionary with all values
@@ -137,7 +135,7 @@ class BridgeContainer():
             logging.debug(str(self.mybridge.get_light(self.individual)))
             return self.mybridge.get_light(self.individual)['state']
 
-    def toggle(self):
+    def toggle(self, dummy=None):
         if self.individual:
             if self.mybridge.get_light(self.individual)['state']['on']:
                 self.mybridge.set_light(self.individual, {'on': False})
@@ -148,14 +146,15 @@ class BridgeContainer():
                 self.mybridge.set_group(0, {'on': False})
             else:
                 self.mybridge.set_group(0, {'on': True})
-    def setOn(self,value):
+
+    def setOn(self, value):
         if self.individual:
             if value:
                 self.mybridge.set_light(self.individual, {'on': True})
             else:
                 self.mybridge.set_light(self.individual, {'on': False})
 
-    def alert(self):
+    def alert(self, dummy=None):
         if self.individual:
             self.mybridge.set_light(self.individual, {'alert':'select'})    
         else:
@@ -272,49 +271,94 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         # tell your preffered friend that you are alive 
         # self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
 
+    def report(self, dummy=None):
+        internetip = urlopen('http://icanhazip.com').read()
+        localip = socket.gethostbyname(socket.gethostname())
+        return u" ".join((
+            'I am',
+            self.boundjid.full,
+            'and I am on localIP',
+            localip,
+            'and on internet',
+            internetip
+        ))
+
+    def help(self, dummy=None):
+        status = bridge.get_state()
+        return u"You had a question I cannot answer. Here's my status instead.\n\non=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s" % (
+            str(status['on']),
+            str(status['bri']),
+            str(status['hue']),
+            str(status['sat']),
+            str(status['ct'])
+        )
+
+    def set_time(self, value):
+        bridge.setTransitionTime(float(value))
+
+    commands = {
+        'on': lambda self, _: { 'on': True },
+        'off': lambda self, _ : { 'on': False },
+        'hue': lambda self, v: { 'hue': int(v) },
+        'sat': lambda self, v: { 'sat': int(v) },
+        'bri': lambda self, v: { 'bri': int(v) },
+        'effect': lambda self, v: { 'effect': v },
+        'fx': lambda self, v: { 'effect': v },
+        'time': lambda self, v: self.set_time(v),
+        'strawberry': lambda self, _: { 'hue': 0, 'sat': 255, 'bri': 255 },
+        'fields': lambda self, _: None,
+        'forever': lambda self, _: None,
+        'orange': lambda self, _: { 'hue': 10000, 'sat': 255, 'bri': 192 },
+        'a': lambda self, _: bridge.alert(),
+        'alert': lambda self, _: bridge.alert(),
+        'alarm': lambda self, _: bridge.alert(),
+        'blink': lambda self, _: bridge.alert(),
+        't': lambda self, _: bridge.toggle(),
+        'toggle': lambda self, _: bridge.toggle(),
+        'hi': lambda self, _: self.report(),
+        'help': lambda self, _: self.help(),
+        '_feck': lambda self, _: "Easy there, father Jack!",
+    }
+
     def message(self, msg):
-        if msg['type'] in ('chat', 'normal'):
-            if msg['body'].startswith('hi'):
-                logging.info("got normal chat message" + str(msg))
-                internetip=urlopen('http://icanhazip.com').read()
-                localip=socket.gethostbyname(socket.gethostname())
-                msg.reply("I am " + self.boundjid.full + " and I am on localIP " +localip +" and on internet " + internetip).send()
-            elif msg['body'].startswith('A'):
-                bridge.alert()
-            elif msg['body'].startswith('?'):
-                logging.debug('got a question ' + str(msg))
-                status=bridge.get_state()
-                msg.reply("mystatus is\n on=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s"%(str(status['on']),str(status['bri']),str(status['hue']),str(status['sat']),str(status['ct']))).send()
-#self.device.refresh([])
-                #logging.debug('momentary values' + str(self.device.momentary_data))
-                #msg.reply(str(self.device.momentary_data)).send()
-            elif msg['body'].startswith('T'):
-                logging.debug('got a toggle ' + str(msg))
-                bridge.toggle()
-            elif msg['body'].find('=')>0:
-                logging.debug('got a control' + str(msg))
-                options = {}
-                for option in msg['body'].split():
-                    (name, value) = option.split('=')
-                    logging.debug('setting %s to %s' % (name, value, ))
-                    if name=="hue":
-                        options['hue'] = int(value)
-                    elif name=="bri":
-                        options['bri'] = int(value)
-                    elif name=="sat":
-                        options['sat'] = int(value)
-                    elif name=="time":
-                        bridge.setTransitionTime(float(value))
-                    elif name=="effect":
-                        options['effect'] = value
-                    elif name=="on":
-                        bridge.toggle()
-                if len(options) > 0:
-                    bridge.sendAll(**options)
-            else:
-                logging.debug('message dropped ' +  msg['body'])
-        else:
+        if msg['type'] not in ('chat', 'normal'):
             logging.debug("got unknown message type %s", str(msg['type']))
+            return
+
+        cmd = msg['body'].lower().strip()
+        if cmd.endswith('?'):
+            msg.reply(self.help()).send()
+            return
+
+        options = {}
+        unknown = []
+        for word in cmd.split():
+            if '=' in word:
+                word, value = word.split('=', 1)
+            else:
+                value = None
+
+            if word.startswith('_'):
+                word = word[1:]
+            if word not in self.commands:
+                unknown.append(word)
+            else:
+                res = self.commands[word](self, value)
+                if isinstance(res, dict):
+                    options.update(res)
+                elif isinstance(res, (unicode, str)):
+                    msg.reply(res).send()
+
+        if len(unknown) > 0:
+            words = list((word for word in self.commands.keys() if word[0] != '_'))
+            words.sort()
+            if len(unknown) > 1:
+                unknown = "%s, or %s" % (', '.join(unknown[:-1]), unknown[-1])
+            else:
+                unknown = unknown[0]
+            msg.reply("I have no idea why someone would use words like %s. I do love words like %s, and %s though." % (unknown, ", ".join(words[:-1]), words[-1])).send()
+        if len(options) > 0:
+            bridge.sendAll(**options)
 
             
 class TheDevice(SensorDevice,ControlDevice):
