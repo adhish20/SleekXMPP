@@ -71,7 +71,13 @@ class DummyBridge():
                       
 class BridgeContainer():
     
-    def __init__(self,transitiontime=50,individual=None,ip=None):
+    def __init__(self,transitiontime=50,individual=None,ip=None,dummy=False):
+        if dummy:
+            self.mybridge=DummyBridge()
+            self.individual=1
+            self.transitiontime = 50
+            return
+        
         self.mybridge=None    
         while not self.mybridge:
             try:
@@ -87,7 +93,7 @@ class BridgeContainer():
             except Exception as e:
                 logging.warn('failed to connect to HUE server did you push the button?')
                 self.mybridge=None    
-                #self.mybridge=DummyBridge()  
+
             sleep(10)
 
         self.transitiontime = transitiontime
@@ -100,19 +106,17 @@ class BridgeContainer():
         # this should be the transistion time in seconds
         self.transitiontime = int(10 * float(value))
 
-    def sendAll(self, hue=None, bri=None, sat=None, effect=None):
+    def sendAll(self, **options):
         lamp = self.individual or 0
-        options = { }
-        if hue is not None: options['hue'] = hue
-        if bri is not None: options['bri'] = bri
-        if sat is not None: options['sat'] = sat
-        if effect is not None: options['effect'] = effect
+        for k,v in options.iteritems():
+            if v is None:
+                del(options[k])
         if self.transitiontime >= 0:
             options['transitiontime'] = self.transitiontime
         if self.individual:
             self.mybridge.set_light(self.individual, options)
         else:
-                self.mybridge.set_group(0, options)
+            self.mybridge.set_group(0, options)
 
     def getAll(self):
         # returns dictionary with all values
@@ -137,7 +141,7 @@ class BridgeContainer():
             logging.debug(str(self.mybridge.get_light(self.individual)))
             return self.mybridge.get_light(self.individual)['state']
 
-    def toggle(self):
+    def toggle(self, dummy=None):
         if self.individual:
             if self.mybridge.get_light(self.individual)['state']['on']:
                 self.mybridge.set_light(self.individual, {'on': False})
@@ -148,14 +152,15 @@ class BridgeContainer():
                 self.mybridge.set_group(0, {'on': False})
             else:
                 self.mybridge.set_group(0, {'on': True})
-    def setOn(self,value):
+
+    def setOn(self, value):
         if self.individual:
             if value:
                 self.mybridge.set_light(self.individual, {'on': True})
             else:
                 self.mybridge.set_light(self.individual, {'on': False})
 
-    def alert(self):
+    def alert(self, dummy=None):
         if self.individual:
             self.mybridge.set_light(self.individual, {'alert':'select'})    
         else:
@@ -178,6 +183,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.register_plugin('xep_0030')
         self.register_plugin('xep_0323')
         self.register_plugin('xep_0325')
+        self.register_plugin('xep_0045')
         self.register_plugin('xep_0199') # XMPP ping
 
         self.add_event_handler("session_start", self.session_start)
@@ -187,12 +193,15 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         #Some local status variables to use
         self.device=None
         self.beServer=True
+        self.joinMucRoom=False
         self.clientJID=None
         self.controlJID=None
         self.received=set()
         self.controlField=None
         self.controlValue=None
         self.toggle=0
+        self.room=""
+        self.nick=""
 
     def datacallback(self,from_jid,result,nodeId=None,timestamp=None,fields=None,error_msg=None):
         """
@@ -232,10 +241,6 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         """
         logging.debug("IoT got a form "+str(result))
         
-    def doReleaseMe(self):
-        # todo thread safe
-        self.releaseMe=True
-        
     def addDevice(self, device):
         self.device=device
 
@@ -270,51 +275,122 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.send_presence()
         self.get_roster()
         # tell your preffered friend that you are alive 
-        # self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
+        # self.send_message(mto='jabberjocke@jabber.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
+        
+        if self.joinMucRoom:
+            logging.info("joining MUC room "+self.room+" as " +self.nick)
+            self.plugin['xep_0045'].joinMUC(self.room,self.nick,wait=False)
+
+    def help(self, dummy=None):
+        status = bridge.get_state()
+        return u"You had a question I cannot answer. Here's my status instead.\n\non=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s" % (
+            str(status['on']),
+            str(status['bri']),
+            str(status['hue']),
+            str(status['sat']),
+            str(status['ct'])
+        )
+
+    def set_time(self, value):
+        bridge.setTransitionTime(float(value))
+
+    commands = {
+        'on': lambda self, _: { 'on': True },
+        'off': lambda self, _ : { 'on': False },
+        'hue': lambda self, v: { 'hue': int(v) },
+        'sat': lambda self, v: { 'sat': int(v) },
+        'bri': lambda self, v: { 'bri': int(v) },
+        'effect': lambda self, v: { 'effect': v },
+        'fx': lambda self, v: { 'effect': v },
+        'time': lambda self, v: self.set_time(v),
+        'strawberry': lambda self, _: { 'hue': 0, 'sat': 255, 'bri': 255 },
+        'fields': lambda self, _: None,
+        'forever': lambda self, _: None,
+        'orange': lambda self, _: { 'hue': 10000, 'sat': 255, 'bri': 192 },
+        'a': lambda self, _: bridge.alert(),
+        'alert': lambda self, _: bridge.alert(),
+        'alarm': lambda self, _: bridge.alert(),
+        'blink': lambda self, _: bridge.alert(),
+        't': lambda self, _: bridge.toggle(),
+        'toggle': lambda self, _: bridge.toggle(),
+        'help': lambda self, _: self.help(),
+        '_feck': lambda self, _: "Easy there, father Jack!",
+    }
 
     def message(self, msg):
-        if msg['type'] in ('chat', 'normal'):
-            if msg['body'].startswith('hi'):
-                logging.info("got normal chat message" + str(msg))
-                internetip=urlopen('http://icanhazip.com').read()
-                localip=socket.gethostbyname(socket.gethostname())
-                msg.reply("I am " + self.boundjid.full + " and I am on localIP " +localip +" and on internet " + internetip).send()
-            elif msg['body'].startswith('A'):
-                bridge.alert()
-            elif msg['body'].startswith('?'):
-                logging.debug('got a question ' + str(msg))
-                status=bridge.get_state()
-                msg.reply("mystatus is\n on=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s"%(str(status['on']),str(status['bri']),str(status['hue']),str(status['sat']),str(status['ct']))).send()
-#self.device.refresh([])
-                #logging.debug('momentary values' + str(self.device.momentary_data))
-                #msg.reply(str(self.device.momentary_data)).send()
-            elif msg['body'].startswith('T'):
-                logging.debug('got a toggle ' + str(msg))
-                bridge.toggle()
-            elif msg['body'].find('=')>0:
-                logging.debug('got a control' + str(msg))
-                options = {}
-                for option in msg['body'].split():
-                    (name, value) = option.split('=')
-                    logging.debug('setting %s to %s' % (name, value, ))
-                    if name=="hue":
-                        options['hue'] = int(value)
-                    elif name=="bri":
-                        options['bri'] = int(value)
-                    elif name=="sat":
-                        options['sat'] = int(value)
-                    elif name=="time":
-                        bridge.setTransitionTime(float(value))
-                    elif name=="effect":
-                        options['effect'] = value
-                    elif name=="on":
-                        bridge.toggle()
-                if len(options) > 0:
-                    bridge.sendAll(**options)
-            else:
-                logging.debug('message dropped ' +  msg['body'])
-        else:
+        if msg['type'] not in ('chat', 'normal','groupchat'):
             logging.debug("got unknown message type %s", str(msg['type']))
+            return
+        
+        if msg['type']=='groupchat':
+            if msg['mucnick'] == self.nick or self.nick in msg['body']:
+                logging.debug("mirror message from room throw away")
+                return
+        #always reply to full JID
+        replyto=msg['from'].full
+
+        #parse the message
+        cmd = msg['body'].lower().strip()
+        
+        if cmd.endswith('?'):
+            #we send normal chat messages back
+            self.send_message(mto=replyto, mbody=self.help())
+            #msg.reply(self.help()).send()
+            ##msg['type']='chat'
+            return
+
+        if cmd.startswith('hi'):
+            internetip = urlopen('http://icanhazip.com').read()
+            localip = socket.gethostbyname(socket.gethostname())
+            jid=""
+            if self.joinMucRoom:
+                if msg['type']=='groupchat' or replyto.startswith(self.room) :
+                    jid=self.nick
+                else:
+                    jid=self.boundjid.full
+            else:
+                jid=self.boundjid.full
+            self.send_message(mto=replyto, mbody=u" ".join((
+                'I am',
+                jid,
+                'and I am on localIP',
+                localip,
+                'and on internet',
+                internetip
+            )))
+            return
+        
+        options = {}
+        unknown = []
+        for word in cmd.split():
+            if '=' in word:
+                word, value = word.split('=', 1)
+            else:
+                value = None
+
+            if word.startswith('_'):
+                word = word[1:]
+            if word not in self.commands:
+                unknown.append(word)
+            else:
+                res = self.commands[word](self, value)
+                if isinstance(res, dict):
+                    options.update(res)
+                elif isinstance(res, (unicode, str)):
+                    self.send_message(mto=replyto, mbody=res)
+                    #msg.reply(res).send()
+
+        if len(unknown) > 0:
+            words = list((word for word in self.commands.keys() if word[0] != '_'))
+            words.sort()
+            if len(unknown) > 1:
+                unknown = "%s, or %s" % (', '.join(unknown[:-1]), unknown[-1])
+            else:
+                unknown = unknown[0]
+            self.send_message(mto=replyto, mbody="I have no idea why someone would use words like %s. I do love words like %s, and %s though." % (unknown, ", ".join(words[:-1]), words[-1]))
+
+        if len(options) > 0:
+            bridge.sendAll(**options)
 
             
 class TheDevice(SensorDevice,ControlDevice):
@@ -398,9 +474,6 @@ if __name__ == '__main__':
     optp.add_option('-v', '--verbose', help='set logging to COMM',
                     action='store_const', dest='loglevel',
                     const=5, default=logging.INFO)
-    optp.add_option('-t', '--pingto', help='set jid to ping',
-                    action='store', type='string', dest='pingjid',
-                    default=None)
 
     # JID and password options.
     optp.add_option("-j", "--jid", dest="jid",
@@ -415,6 +488,8 @@ if __name__ == '__main__':
                     help="setting the control to an individual", default=None)
     optp.add_option("--bridgeip", dest="bridgeip",
                     help="This is where the bridge is", default=None)
+    optp.add_option("--room", dest="room",
+                    help="MUC room to connect to", default=None)
     
     opts, args = optp.parse_args()
 
@@ -427,13 +502,20 @@ if __name__ == '__main__':
     if opts.password is None:
         opts.password = getpass.getpass("Password: ")
 
-    logging.debug("setting an individual to" + str(opts.individual))
+    logging.debug("setting the individual to" + str(opts.individual))
 
-    #connect to a bridge
-    bridge=BridgeContainer(individual=opts.individual,ip=opts.bridgeip)
-
+    #connect to a bridge, use dummy true if you don't have a gateway nearby for testing 
+    bridge=BridgeContainer(individual=opts.individual,ip=opts.bridgeip,dummy=False)
+    
     #start up the XMPP client
     xmpp = IoT_TestDevice(opts.jid,opts.password)
+
+    if opts.room:
+        #we will be using a multiuser room chat to connect to
+        xmpp.nick=opts.nodeid
+        xmpp.room=opts.room
+        xmpp.joinMucRoom=True
+    
     
     # Instansiate the device object
     myDevice = TheDevice(opts.nodeid);
@@ -465,4 +547,3 @@ if __name__ == '__main__':
     xmpp.connect()
     xmpp.process(block=True)    
     logging.debug("lost connection")
-            
