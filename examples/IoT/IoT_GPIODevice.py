@@ -20,7 +20,7 @@ import os
 import sys
 
 # This can be used when you are in a test environment and need to make paths right
-sys.path=[os.path.join(os.path.dirname(__file__), '..')]+sys.path
+sys.path=[os.path.join(os.path.dirname(__file__), '../..')]+sys.path
 
 import logging
 import unittest
@@ -86,7 +86,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.send_presence()
         self.get_roster()
         # tell your preffered friend that you are alive 
-        self.send_message(mto='jocke@jabber.sust.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
+        self.send_message(mto='jabberjocke@jabber.se', mbody=self.boundjid.bare +' is now online use xep_323/325 stanza to talk to me')
 
     def message(self, msg):
         if msg['type'] in ('chat', 'normal'):

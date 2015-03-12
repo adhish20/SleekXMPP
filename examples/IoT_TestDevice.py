@@ -49,8 +49,8 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
     """
     A simple IoT device that can act as server or client both on xep 323 and 325
     """
-    
-    def __init__(self, jid, password):
+
+    def __init__(self, jid = None, password = None):
         sleekxmpp.ClientXMPP.__init__(self, jid, password)
 
         self.register_plugin('xep_0030')
@@ -326,6 +326,14 @@ if __name__ == '__main__':
                     help="JID to use")
     optp.add_option("-p", "--password", dest="password",
                     help="password to use")
+    optp.add_option("--phost", dest="proxy_host",
+                    help="Proxy hostname", default = None)
+    optp.add_option("--pport", dest="proxy_port",
+                    help="Proxy port", default = None)
+    optp.add_option("--puser", dest="proxy_user",
+                    help="Proxy username", default = None)
+    optp.add_option("--ppass", dest="proxy_pass",
+                    help="Proxy password", default = None)
 
     # IoT test
     optp.add_option("-n", "--nodeid", dest="nodeid",
@@ -354,7 +362,15 @@ if __name__ == '__main__':
         
     xmpp = IoT_TestDevice(opts.jid,opts.password)
     xmpp.delayValue=int(opts.delayvalue)
-    logging.debug("DELAY " + str(int(opts.delayvalue)) + "  " + str(xmpp.delayValue))
+    logging.debug("DELAY " + str(int(opts.delayvalue)) + "  " + str(xmpp.delayValue)) 
+
+    if opts.proxy_host:
+        xmpp.use_proxy = True
+        xmpp.proxy_config = {
+            'host' : opts.proxy_host,
+            'port' : int(opts.proxy_port),
+            'username' : opts.proxy_user,
+            'password' : opts.proxy_pass}
     
     if opts.nodeid:
         # prepare the IoT_TestDevice to be a provider of data and be able to recieve control commands
@@ -370,7 +386,7 @@ if __name__ == '__main__':
         myDevice._set_momentary_timestamp(myDevice._get_timestamp())
         myDevice._add_field_momentary_data("Counter", "0", flags={"automaticReadout": "true","momentary":"true"});
         myDevice._add_field_momentary_data("Relay", "0", flags={"automaticReadout": "true","momentary":"true" , "writeable":"true"});
-        
+
         xmpp['xep_0323'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp['xep_0325'].register_node(nodeId=opts.nodeid, device=myDevice, commTimeout=10);
         xmpp.beClientOrServer(server=True)

@@ -180,7 +180,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         logging.debug('Maximum is %d' % (max_lightlevel,))
         connections = self.client_roster.presence('john@ik.nu')
         for res, pres in connections.items():
-            session = self['xep_0325'].set_request(self.boundjid.full, 'john@ik.nu'+"/"+res, self.controlcallback, [("bri", "long", str(control))])
+            session = self['xep_0325'].set_request(self.boundjid.full, 'john@ik.nu'+"/"+res, self.controlcallback, [("bri", "numeric", str(control))])
 
 
         # check distance
@@ -192,7 +192,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         logging.debug('Maximum is %d' % (max_distance,))
         connections = self.client_roster.presence('paul@ik.nu')
         for res, pres in connections.items():
-            session = self['xep_0325'].set_request(self.boundjid.full, 'paul@ik.nu'+"/"+res, self.controlcallback, [("hue", "long", str(control))])
+            session = self['xep_0325'].set_request(self.boundjid.full, 'paul@ik.nu'+"/"+res, self.controlcallback, [("hue", "numeric", str(control))])
         
     def controlcallback(self,from_jid,result,error_msg,nodeIds=None,fields=None):
         """

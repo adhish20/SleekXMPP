@@ -317,6 +317,55 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         '_feck': lambda self, _: "Easy there, father Jack!",
     }
 
+    def report(self, dummy=None):
+        internetip = urlopen('http://icanhazip.com').read()
+        localip = socket.gethostbyname(socket.gethostname())
+        return u" ".join((
+            'I am',
+            self.boundjid.full,
+            'and I am on localIP',
+            localip,
+            'and on internet',
+            internetip
+        ))
+
+    def help(self, dummy=None):
+        status = bridge.get_state()
+        return u"You had a question I cannot answer. Here's my status instead.\n\non=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s" % (
+            str(status['on']),
+            str(status['bri']),
+            str(status['hue']),
+            str(status['sat']),
+            str(status['ct'])
+        )
+
+    def set_time(self, value):
+        bridge.setTransitionTime(float(value))
+
+    commands = {
+        'on': lambda self, _: { 'on': True },
+        'off': lambda self, _ : { 'on': False },
+        'hue': lambda self, v: { 'hue': int(v) },
+        'sat': lambda self, v: { 'sat': int(v) },
+        'bri': lambda self, v: { 'bri': int(v) },
+        'effect': lambda self, v: { 'effect': v },
+        'fx': lambda self, v: { 'effect': v },
+        'time': lambda self, v: self.set_time(v),
+        'strawberry': lambda self, _: { 'hue': 0, 'sat': 255, 'bri': 255 },
+        'fields': lambda self, _: None,
+        'forever': lambda self, _: None,
+        'orange': lambda self, _: { 'hue': 10000, 'sat': 255, 'bri': 192 },
+        'a': lambda self, _: bridge.alert(),
+        'alert': lambda self, _: bridge.alert(),
+        'alarm': lambda self, _: bridge.alert(),
+        'blink': lambda self, _: bridge.alert(),
+        't': lambda self, _: bridge.toggle(),
+        'toggle': lambda self, _: bridge.toggle(),
+        'hi': lambda self, _: self.report(),
+        'help': lambda self, _: self.help(),
+        '_feck': lambda self, _: "Easy there, father Jack!",
+    }
+
     def message(self, msg):
         if msg['type'] not in ('chat', 'normal','groupchat'):
             logging.debug("got unknown message type %s", str(msg['type']))
@@ -378,7 +427,6 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
                     options.update(res)
                 elif isinstance(res, (unicode, str)):
                     self.send_message(mto=replyto, mbody=res)
-                    #msg.reply(res).send()
 
         if len(unknown) > 0:
             words = list((word for word in self.commands.keys() if word[0] != '_'))
