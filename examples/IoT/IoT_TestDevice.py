@@ -332,6 +332,14 @@ if __name__ == '__main__':
                     help="JID to use")
     optp.add_option("-p", "--password", dest="password",
                     help="password to use")
+    optp.add_option("--phost", dest="proxy_host",
+                    help="Proxy hostname", default = None)
+    optp.add_option("--pport", dest="proxy_port",
+                    help="Proxy port", default = None)
+    optp.add_option("--puser", dest="proxy_user",
+                    help="Proxy username", default = None)
+    optp.add_option("--ppass", dest="proxy_pass",
+                    help="Proxy password", default = None)
 
     # Useful to test
     optp.add_option('-t', '--pingto', help='set jid to ping',
@@ -368,6 +376,14 @@ if __name__ == '__main__':
     xmpp = IoT_TestDevice(opts.jid,opts.password)
     xmpp.delayValue=int(opts.delayvalue)
     logging.debug("DELAY " + str(int(opts.delayvalue)) + "  " + str(xmpp.delayValue))
+    
+    if opts.proxy_host:
+        xmpp.use_proxy = True
+        xmpp.proxy_config = {
+            'host' : opts.proxy_host,
+            'port' : int(opts.proxy_port),
+            'username' : opts.proxy_user,
+            'password' : opts.proxy_pass}
     
     if opts.nodeid:
         # prepare the IoT_TestDevice to be a provider of data and be able to recieve control commands
@@ -408,4 +424,3 @@ if __name__ == '__main__':
         logging.debug("ready ending")
     else:
        print "noopp didn't happen"
-
