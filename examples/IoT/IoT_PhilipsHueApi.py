@@ -275,7 +275,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.send_presence()
         self.get_roster()
         # tell your preffered friend that you are alive 
-        # self.send_message(mto='jabberjocke@jabber.se', mbody=self.boundjid.bare +' is now online use xep_323 stanza to talk to me')
+        self.send_message(mto='jabberjocke@jabber.se', mbody=self.boundjid.full +' is online use xep_323 to talk to me')
         
         if self.joinMucRoom:
             logging.info("joining MUC room "+self.room+" as " +self.nick)
@@ -283,13 +283,11 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
 
     def help(self, dummy=None):
         status = bridge.get_state()
-        return u"You had a question I cannot answer. Here's my status instead.\n\non=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s" % (
-            str(status['on']),
-            str(status['bri']),
-            str(status['hue']),
-            str(status['sat']),
-            str(status['ct'])
-        )
+        reply=u"You had a question I cannot answer. Here's my status instead.\n"
+        for key in ['on','bri','hue','sat','ct']:
+            if status.has_key(key):
+                reply+="\n"+key+"="+status[key]
+        return reply
 
     def set_time(self, value):
         bridge.setTransitionTime(float(value))
@@ -313,55 +311,6 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         'blink': lambda self, _: bridge.alert(),
         't': lambda self, _: bridge.toggle(),
         'toggle': lambda self, _: bridge.toggle(),
-        'help': lambda self, _: self.help(),
-        '_feck': lambda self, _: "Easy there, father Jack!",
-    }
-
-    def report(self, dummy=None):
-        internetip = urlopen('http://icanhazip.com').read()
-        localip = socket.gethostbyname(socket.gethostname())
-        return u" ".join((
-            'I am',
-            self.boundjid.full,
-            'and I am on localIP',
-            localip,
-            'and on internet',
-            internetip
-        ))
-
-    def help(self, dummy=None):
-        status = bridge.get_state()
-        return u"You had a question I cannot answer. Here's my status instead.\n\non=%s\nbri=%s\nhue=%s\nsat=%s\nct=%s" % (
-            str(status['on']),
-            str(status['bri']),
-            str(status['hue']),
-            str(status['sat']),
-            str(status['ct'])
-        )
-
-    def set_time(self, value):
-        bridge.setTransitionTime(float(value))
-
-    commands = {
-        'on': lambda self, _: { 'on': True },
-        'off': lambda self, _ : { 'on': False },
-        'hue': lambda self, v: { 'hue': int(v) },
-        'sat': lambda self, v: { 'sat': int(v) },
-        'bri': lambda self, v: { 'bri': int(v) },
-        'effect': lambda self, v: { 'effect': v },
-        'fx': lambda self, v: { 'effect': v },
-        'time': lambda self, v: self.set_time(v),
-        'strawberry': lambda self, _: { 'hue': 0, 'sat': 255, 'bri': 255 },
-        'fields': lambda self, _: None,
-        'forever': lambda self, _: None,
-        'orange': lambda self, _: { 'hue': 10000, 'sat': 255, 'bri': 192 },
-        'a': lambda self, _: bridge.alert(),
-        'alert': lambda self, _: bridge.alert(),
-        'alarm': lambda self, _: bridge.alert(),
-        'blink': lambda self, _: bridge.alert(),
-        't': lambda self, _: bridge.toggle(),
-        'toggle': lambda self, _: bridge.toggle(),
-        'hi': lambda self, _: self.report(),
         'help': lambda self, _: self.help(),
         '_feck': lambda self, _: "Easy there, father Jack!",
     }
@@ -393,6 +342,7 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
             localip = socket.gethostbyname(socket.gethostname())
             jid=""
             if self.joinMucRoom:
+                #we need to keep some privacy in the MUC rooms
                 if msg['type']=='groupchat' or replyto.startswith(self.room) :
                     jid=self.nick
                 else:
