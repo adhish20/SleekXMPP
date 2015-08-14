@@ -166,9 +166,10 @@ class XEP_0323(BasePlugin):
 
     def post_init(self):
         """ Init complete. Register our features in Serivce discovery. """
+        #logging.debug("setting the Disco discovery for %s" % Sensordata.namespace)
+        #self.xmpp['xep_0030'].add_feature(Sensordata.namespace)
+        #self.xmpp['xep_0030'].set_items(node=Sensordata.namespace, items=tuple())
         BasePlugin.post_init(self)
-        # self.xmpp['xep_0030'].add_feature(Sensordata.namespace)
-        # self.xmpp['xep_0030'].set_items(node=Sensordata.namespace, items=tuple())
 
     def _new_session(self):
         """ Return a new session ID. """
@@ -613,7 +614,7 @@ class XEP_0323(BasePlugin):
         iq['req']._set_flags(flags);
 
         self.sessions[seqnr] = {"from": iq['from'], "to": iq['to'], "seqnr": seqnr, "callback": callback};
-        logging.info('IoT SEND 42 '+str(iq))
+        logging.debug('IoT SEND 323 REQ '+str(iq))
         iq.send(block=False); 
 
         return seqnr;
@@ -680,7 +681,7 @@ class XEP_0323(BasePlugin):
         Received Msg with fields - this is a data reponse to a request.
         If this is the last data block, issue a "done" callback.
         """
-        logging.info('IoT RECIEVE ' + str(msg))
+        logging.debug('IoT RECIEVE ' + str(msg))
         seqnr = msg['fields']['seqnr'];
         callback = self.sessions[seqnr]["callback"];
         for node in msg['fields']['nodes']:

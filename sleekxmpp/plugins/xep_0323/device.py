@@ -214,6 +214,12 @@ class Device(object):
 		"""
 		self.fields[name] = {"type": typename, "unit": unit, "dataType": dataType};
 
+	def _get_field(self,name):
+		"""
+		Returns the field as the dictionary content
+		"""
+		return self.fields[name]
+    
 	def _add_field_timestamp_data(self, name, timestamp, value, flags=None):
 		"""
 		Adds timestamped data to a field

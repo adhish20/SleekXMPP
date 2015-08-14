@@ -59,7 +59,8 @@ class Request(ElementBase):
         Arguments:
             xml -- Use an existing XML object for the stanza's values.
         """
-        logging.info("SENSORDATA "+ str(xml))
+        if xml:
+            logging.debug("SENSORDATA "+ str(xml))
         ElementBase.setup(self, xml)
         self._nodes = set([node['nodeId'] for node in self['nodes']])
         self._fields = set([field['name'] for field in self['fields']])
