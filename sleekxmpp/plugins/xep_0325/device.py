@@ -66,7 +66,7 @@ class Device(object):
         	    error_msg   -- [optional] Only applies when result == "error".
             	               Error details when a request failed.
 		"""
-		logging.debug("control sent fields " + str(fields))
+		logging.debug("set control fields " + str(fields))
 		if len(fields) > 0:
 			# Check availiability
 			for name, typename, value in fields:

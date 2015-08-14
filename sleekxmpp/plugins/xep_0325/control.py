@@ -557,10 +557,10 @@ class XEP_0325(BasePlugin):
         self.sessions[seqnr] = {"from": iq['from'], "to": iq['to'], "callback": callback};
         iq.send(block=False); 
 
-    def set_command(self, from_jid, to_jid, fields, nodeIds=None):
+    def set_command(self, from_jid, to_jid, fields, nodeIds=None, mtype=None):
         """ 
         Called on the client side to initiade a control command.
-        Composes a message with the set commandand sends it to the device(s).
+        Composes a message with the set command and sends it to the device(s).
         Does not block. Device(s) will not respond, regardless of result.
         
         Arguments:
@@ -569,11 +569,14 @@ class XEP_0325(BasePlugin):
 
             fields          -- Fields to set. List of tuple format: (name, typename, value).
             nodeIds         -- [optional] Limits the request to the node Ids in this list.
+            type            -- [optional] can be used if you would like to add a type to the message
+                               eg used in groupchat messages
         """
         msg = self.xmpp.Message();
         msg['from'] = from_jid;
         msg['to'] = to_jid;
-        msg['type'] = "set";
+        if mtype:
+            msg['type'] = str(mtype)
         if nodeIds is not None:
             for nodeId in nodeIds:
                 msg['set'].add_node(nodeId);
