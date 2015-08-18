@@ -31,7 +31,7 @@ class FieldStatus():
     """ 
     All field statuses are optional booleans that default to False
     """
-    field_status = set([ 'missing','automaticEstimate','manualEstimate','manualReadout','automaticReadout','timeOffset','warning','error', \
+    field_status = set([ 'missing','automaticEstimate','manualEstimate','manualReadout','historical','automaticReadout','timeOffset','warning','error', \
                          'signed','invoiced','endOfSeries','powerFailure','invoiceConfirmed','writable'])
 
 class Request(ElementBase):

@@ -21,8 +21,7 @@ class Logger:
 
 	def LocalRetrieve(self, jid, field, fromTime, toTime):
 		"""Retrieves History from Local Storage"""
-
-		os.chdir(jid.node)
+		os.chdir(jid.split('@')[0])
 		timestamp = []
 		node = []
 		typename = []
@@ -31,12 +30,13 @@ class Logger:
 		unit = []
 		with open(field+'.log', 'r') as f:
 			for line in f:
-				line.split('; ')
-				if line[0] > fromTime and line[0] < toTime:
-					timestamp.append(line[0])
-					node.append(line[1])
-					typename.append(line[2])
-					name.append(line[3])
-					value.append(line[4])
-					unit.append(line[5].split('\n')[0])
-		return timestamp, node, typename, name, value, unit
+				data = line.split('; ')
+				if data[0] > fromTime and data[0] < toTime:
+					timestamp.append(data[0])
+					node.append(data[1])
+					typename.append(data[2])
+					name.append(data[3])
+					value.append(data[4])
+					unit.append(data[5].split('\n')[0])
+		os.chdir('..')
+		return (timestamp, node, typename, name, value, unit)

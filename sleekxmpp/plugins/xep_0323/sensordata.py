@@ -482,15 +482,28 @@ class XEP_0323(BasePlugin):
 
             if timestamp_block is not None and len(timestamp_block) > 0:
                 node = msg['fields'].add_node(nodeId);
-                ts = node.add_timestamp(timestamp_block["timestamp"]);
+                if isinstance(timestamp_block, dict):
+                    ts = node.add_timestamp(timestamp_block["timestamp"]);
 
-                for f in timestamp_block["fields"]:
-                    data = ts.add_data( typename=f['type'], 
-                                        name=f['name'], 
-                                        value=f['value'], 
-                                        unit=f['unit'], 
-                                        dataType=f['dataType'], 
-                                        flags=f['flags']);
+                    for f in timestamp_block["fields"]:
+                        data = ts.add_data( typename=f['type'], 
+                                            name=f['name'], 
+                                            value=f['value'], 
+                                            unit=f['unit'], 
+                                            dataType=f['dataType'], 
+                                            flags=f['flags']);
+                else:
+                    for timestamp in timestamp_block:
+                        ts = node.add_timestamp(timestamp["timestamp"]);
+                        for f in timestamp["fields"]:
+                            data = ts.add_data( typename=f['type'], 
+                                                name=f['name'], 
+                                                value=f['value'], 
+                                                unit=f['unit'], 
+                                                dataType=f['dataType'], 
+                                                flags=f['flags'])
+                            print f['flags']
+                            print data
 
             if result == "done":
                 self.sessions[session]["commTimers"][nodeId].cancel();

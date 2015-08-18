@@ -141,15 +141,13 @@ class Device(object):
             callback(session, result="done", nodeId=self.nodeId, timestamp_block=ts_block);
             return
 
+        if "historical" in flags and flags['historical'] == "true":
+            self.get_history(session, fields, flags['from'], flags['to'], callback)
+            return
+
         from_flag = self._datetime_flag_parser(flags, 'from')
         to_flag = self._datetime_flag_parser(flags, 'to')
 
-        if "historical" in flags and flags['historical'] == "true":
-            self.get_history(session, fields, from_flag, to_flag, callback)
-
-        callback(session, result="done", nodeId=self.nodeId, timestamp_block=None);
-
-    def get_history(self, session, fields, from_flag, to_flag, callback):
         for ts in sorted(self.timestamp_data.keys()):
             logging.debug("reporting timestamped data")
             tsdt = datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S")
@@ -177,7 +175,12 @@ class Device(object):
             ts_block["timestamp"] = ts;
             ts_block["fields"] = field_block;
             callback(session, result="fields", nodeId=self.nodeId, timestamp_block=ts_block);
-            return
+
+        callback(session, result="done", nodeId=self.nodeId, timestamp_block=None);
+
+    def get_history(self, session, fields, from_flag, to_flag, callback):
+        """Over Ride with Hisory Function"""
+        pass
 
     def _datetime_flag_parser(self, flags, flagname):
         if not flagname in flags:

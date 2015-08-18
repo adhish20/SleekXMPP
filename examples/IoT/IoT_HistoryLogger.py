@@ -52,18 +52,19 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
         self.add_event_handler("changed_status",self.manage_status)
 
         #Some local status variables to use
-        self.device=None
-        self.logger=Logger()
-        self.releaseMe=False
-        self.beServer=True
-        self.clientJID=None
-        self.controlJID=None
-        self.received=set()
-        self.controlField=None
-        self.controlValue=None
-        self.controlType=None
-        self.delayValue=None
-        self.toggle=0
+        self.device = None
+        self.logger = Logger()
+        self.releaseMe = False
+        self.beServer = True
+        self.clientJID = None
+        self.controlJID = None
+        self.received = set()
+        self.controlField = None
+        self.controlValue = None
+        self.controlType = None
+        self.delayValue = None
+        self.toggle = 0
+        self.fieldsRegistered = False
 
     def datacallback(self,from_jid,result,nodeId=None,timestamp=None,fields=None,error_msg=None):
         """
@@ -82,6 +83,10 @@ class IoT_TestDevice(sleekxmpp.ClientXMPP):
             logging.debug("we got accepted from %s",from_jid)            
         elif result=='fields':
             logging.info("we got fields from %s on node %s",from_jid,nodeId)
+            if not self.fieldsRegistered:
+                self.fieldsRegistered = True
+                for field in fields:
+                    xmpp.device._add_field(name=field['name'], typename=field['typename'], unit=field['unit'])
             for field in fields:
                 # Storing in Log
                 self.logger.LocalStore(from_jid, timestamp, nodeId, field['typename'], field['name'], field['value'], field['unit'])
@@ -199,21 +204,26 @@ class TheDevice(SensorDevice):
     """
     def __init__(self,nodeId):
         SensorDevice.__init__(self,nodeId)
+        self.logger = Logger() 
 
     def get_history(self, session, fields, from_flag, to_flag, callback):
 
         field = fields[0]
         timestamp, node, typename, name, value, unit = self.logger.LocalRetrieve(opts.jid, field, from_flag, to_flag)
-        ts_block = {}
-        field_block = {"name": name[i], 
-                        "type": typename[i], 
-                        "unit": unit[i],
-                        "value": value[i], 
-                        "flags": {'historical': 'true', 'automaticReadout': 'true'}}
-        ts_block["timestamp"] = timestamp[i]
-        ts_block["fields"] = field_block
-
-        callback(session, result="fields", nodeId=self.nodeId, timestamp_block=ts_block);
+        time_block = []
+        for i in range(len(timestamp)):
+            ts_block = {}
+            field_block = [];
+            field_block.append({"name": name[i],
+                            "type": typename[i], 
+                            "unit": unit[i],
+                            "dataType": None,
+                            "value": value[i], 
+                            "flags": {'historical': 'true', 'automaticReadout': 'true'}})
+            ts_block["timestamp"] = timestamp[i]
+            ts_block["fields"] = field_block
+            time_block.append(ts_block)
+        callback(session, result="done", nodeId=self.nodeId, timestamp_block=time_block);
         return
         
 if __name__ == '__main__':
