@@ -502,8 +502,6 @@ class XEP_0323(BasePlugin):
                                                 unit=f['unit'], 
                                                 dataType=f['dataType'], 
                                                 flags=f['flags'])
-                            print f['flags']
-                            print data
 
             if result == "done":
                 self.sessions[session]["commTimers"][nodeId].cancel();
