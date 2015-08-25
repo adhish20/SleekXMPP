@@ -12,7 +12,7 @@ class Logger:
 			timestamp : Timestamp of the Data
 			node : Node ID of the JID
 			typename : type of Field . e.g. 'numeric', 'boolean', etc
-			field : Name of the Field
+			field : Name of the Field.
 			value : Value of the Field.
 			unit : Unit of the Value.
 		"""
@@ -30,7 +30,16 @@ class Logger:
 		return
 
 	def LocalRetrieve(self, jid, field, fromTime, toTime):
-		"""Retrieves History from Local Storage"""
+		"""
+		Retrieves History from Local Storage.
+		
+		returns Arrays (timestamp, node, typename, name, value, unit) containing History Information.
+		Arguments:
+			jid : JID of the Contact.
+			field : Name of the Field whose history is to revealed.
+			fromTime : Time from when history should be revealed.
+			toTime : Time till when history should be revealed.
+		"""
 		os.chdir(jid.split('@')[0])
 		timestamp = []
 		node = []
