@@ -5,7 +5,17 @@ class Logger:
 	"""An API for storing and retrieving History Information"""
 
 	def LocalStore(self, jid, timestamp, node, typename, field, value, unit):
-		"""Stores Timestamped Values of Fields of a Jid in Files as a Log for History"""
+		"""
+		Stores Timestamped Values of Fields of a Jid in Files as a Log for History
+		Arguments:
+			jid : JID of the Contact
+			timestamp : Timestamp of the Data
+			node : Node ID of the JID
+			typename : type of Field . e.g. 'numeric', 'boolean', etc
+			field : Name of the Field
+			value : Value of the Field.
+			unit : Unit of the Value.
+		"""
 
 		if not os.path.exists(jid.node):
 			os.makedirs(jid.node)
